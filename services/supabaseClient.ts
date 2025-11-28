@@ -85,7 +85,7 @@ create table if not exists payments (
   created_at timestamptz default now()
 );
 
--- 3. Users Table (Note: Renamed to 'users' based on existing DB hints)
+-- 3. Users Table
 create table if not exists users (
   id uuid default gen_random_uuid() primary key,
   username text unique not null,
@@ -95,26 +95,49 @@ create table if not exists users (
   created_at timestamptz default now()
 );
 
--- 4. SCHEMA REPAIR (Run this if you get "column not found" errors)
+-- 4. Cheque Entries Table (NEW)
+create table if not exists cheque_entries (
+  id uuid default gen_random_uuid() primary key,
+  date date not null,
+  party_name text not null,
+  cheque_number text not null,
+  bank_name text,
+  amount numeric not null,
+  status text default 'Pending',
+  file_url text,
+  created_by text,
+  created_at timestamptz default now()
+);
+
+-- 5. STORAGE BUCKET SETUP (Run this separately to enable file uploads)
+-- Insert a new bucket named 'cheques'
+insert into storage.buckets (id, name, public) values ('cheques', 'cheques', true);
+
+-- Enable RLS for Storage
+create policy "Public Access" on storage.objects for all using ( bucket_id = 'cheques' );
+
+
+-- 6. SCHEMA REPAIR (Run this if you get "column not found" errors)
 alter table entries add column if not exists material text;
 alter table entries add column if not exists challan_number text;
 alter table entries add column if not exists vehicle_number text;
 alter table entries add column if not exists site_name text;
 
--- 5. RLS POLICIES (REQUIRED FOR DELETE TO WORK) --
--- Run this block if you are unable to delete entries --
+-- 7. RLS POLICIES (REQUIRED FOR DELETE TO WORK) --
 alter table entries enable row level security;
 alter table payments enable row level security;
 alter table users enable row level security;
+alter table cheque_entries enable row level security;
 
 -- Drop existing policies to prevent conflicts
 drop policy if exists "Public access entries" on entries;
 drop policy if exists "Public access payments" on payments;
 drop policy if exists "Public access users" on users;
+drop policy if exists "Public access cheques" on cheque_entries;
 
 -- Allow ALL operations (Insert, Update, DELETE, Select) for public users
--- (Since we manage auth in the app, we trust the client key for now)
 create policy "Public access entries" on entries for all using (true) with check (true);
 create policy "Public access payments" on payments for all using (true) with check (true);
 create policy "Public access users" on users for all using (true) with check (true);
+create policy "Public access cheques" on cheque_entries for all using (true) with check (true);
 */

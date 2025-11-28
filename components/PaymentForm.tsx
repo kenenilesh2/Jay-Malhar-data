@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SupplierPayment } from '../types';
+import { SUPPLIERS_LIST } from '../constants';
 
 interface PaymentFormProps {
   currentUser: string;
@@ -10,6 +11,8 @@ interface PaymentFormProps {
 
 const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, initialData, onSubmit, onCancel }) => {
   const [loading, setLoading] = useState(false);
+  const [isCustomSupplier, setIsCustomSupplier] = useState(false);
+
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     supplierName: '',
@@ -20,6 +23,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, initialData, onS
 
   useEffect(() => {
     if (initialData) {
+      // Check if initial supplier is in the predefined list
+      const isPredefined = SUPPLIERS_LIST.includes(initialData.supplierName);
+      
       setFormData({
         date: initialData.date,
         supplierName: initialData.supplierName,
@@ -27,12 +33,24 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, initialData, onS
         paymentMode: initialData.paymentMode,
         notes: initialData.notes || '',
       });
+      setIsCustomSupplier(!isPredefined && !!initialData.supplierName);
     }
   }, [initialData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSupplierSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === 'OTHER') {
+      setIsCustomSupplier(true);
+      setFormData(prev => ({ ...prev, supplierName: '' }));
+    } else {
+      setIsCustomSupplier(false);
+      setFormData(prev => ({ ...prev, supplierName: val }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,15 +100,42 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, initialData, onS
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Supplier Name</label>
-            <input
-              type="text"
-              name="supplierName"
-              required
-              placeholder="Enter supplier name"
-              value={formData.supplierName}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-            />
+            {!isCustomSupplier ? (
+              <select
+                name="supplierNameSelect"
+                required
+                value={formData.supplierName && !isCustomSupplier ? formData.supplierName : (formData.supplierName ? '' : '')}
+                onChange={handleSupplierSelect}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+              >
+                <option value="">-- Select Supplier --</option>
+                {SUPPLIERS_LIST.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+                <option value="OTHER">Other / New Supplier</option>
+              </select>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  name="supplierName"
+                  required
+                  placeholder="Enter supplier name"
+                  value={formData.supplierName}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                  autoFocus
+                />
+                <button 
+                  type="button"
+                  onClick={() => { setIsCustomSupplier(false); setFormData(p => ({...p, supplierName: ''})); }}
+                  className="px-3 py-2 bg-slate-100 text-slate-600 rounded hover:bg-slate-200"
+                  title="Back to list"
+                >
+                  <i className="fas fa-list"></i>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

@@ -61,8 +61,12 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
     generateMonthlyInvoicePDF(selectedMonth, selectedCategory, invoiceItems, totalBase, cgstAmt + sgstAmt, grandTotal);
   };
 
-  // Get unique materials in this selection to show rate inputs
-  const uniqueMaterials = Array.from(new Set(filteredEntries.map(e => e.material)));
+  // Get ALL materials that belong to this category (to show rates even if no entries exist yet)
+  const categoryMaterials = useMemo(() => {
+    return Object.keys(MATERIAL_CATEGORIES).filter(
+      mat => MATERIAL_CATEGORIES[mat] === selectedCategory
+    );
+  }, [selectedCategory]);
 
   return (
     <div className="space-y-6">
@@ -102,24 +106,22 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
         </div>
 
         {/* Rate Configuration */}
-        {uniqueMaterials.length > 0 && (
-          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Rate Configuration (Per Unit)</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {uniqueMaterials.map(mat => (
-                <div key={mat}>
-                  <label className="block text-xs text-slate-500 mb-1">{mat}</label>
-                  <input 
-                    type="number" 
-                    value={customRates[mat]} 
-                    onChange={(e) => handleRateChange(mat, e.target.value)}
-                    className="w-full px-3 py-1 border border-slate-300 rounded text-sm"
-                  />
-                </div>
-              ))}
-            </div>
+        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
+          <h3 className="text-sm font-semibold text-slate-700 mb-3">Rate Configuration (Per Unit)</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {categoryMaterials.map(mat => (
+              <div key={mat}>
+                <label className="block text-xs text-slate-500 mb-1">{mat}</label>
+                <input 
+                  type="number" 
+                  value={customRates[mat] ?? 0} 
+                  onChange={(e) => handleRateChange(mat, e.target.value)}
+                  className="w-full px-3 py-1 border border-slate-300 rounded text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                />
+              </div>
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Preview Table */}
         <div className="overflow-x-auto border rounded-lg">
@@ -128,6 +130,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Challan</th>
+                <th className="px-4 py-3">Vehicle</th>
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3 text-right">Qty</th>
                 <th className="px-4 py-3 text-right">Rate</th>
@@ -140,6 +143,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
                   <tr key={idx} className="hover:bg-slate-50">
                     <td className="px-4 py-2">{item.date}</td>
                     <td className="px-4 py-2">{item.challanNumber}</td>
+                    <td className="px-4 py-2">{item.vehicleNumber}</td>
                     <td className="px-4 py-2">{item.description}</td>
                     <td className="px-4 py-2 text-right">{item.quantity}</td>
                     <td className="px-4 py-2 text-right">{formatCurrency(item.rate)}</td>
@@ -148,30 +152,30 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">No entries found</td>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">No entries found for this period.</td>
                 </tr>
               )}
             </tbody>
             {invoiceItems.length > 0 && (
               <tfoot className="bg-slate-50 font-bold text-slate-800">
                 <tr>
-                  <td colSpan={5} className="px-4 py-2 text-right">Sub Total</td>
+                  <td colSpan={6} className="px-4 py-2 text-right">Sub Total</td>
                   <td className="px-4 py-2 text-right">{formatCurrency(totalBase)}</td>
                 </tr>
                 {selectedCategory !== 'Water Supply' && (
                   <>
                      <tr>
-                      <td colSpan={5} className="px-4 py-2 text-right text-xs font-normal">CGST ({taxConfig.cgst}%)</td>
+                      <td colSpan={6} className="px-4 py-2 text-right text-xs font-normal">CGST ({taxConfig.cgst}%)</td>
                       <td className="px-4 py-2 text-right text-xs font-normal">{formatCurrency(cgstAmt)}</td>
                     </tr>
                     <tr>
-                      <td colSpan={5} className="px-4 py-2 text-right text-xs font-normal">SGST ({taxConfig.sgst}%)</td>
+                      <td colSpan={6} className="px-4 py-2 text-right text-xs font-normal">SGST ({taxConfig.sgst}%)</td>
                       <td className="px-4 py-2 text-right text-xs font-normal">{formatCurrency(sgstAmt)}</td>
                     </tr>
                   </>
                 )}
                 <tr className="bg-slate-200">
-                  <td colSpan={5} className="px-4 py-3 text-right text-base">Grand Total</td>
+                  <td colSpan={6} className="px-4 py-3 text-right text-base">Grand Total</td>
                   <td className="px-4 py-3 text-right text-base text-brand-700">{formatCurrency(grandTotal)}</td>
                 </tr>
               </tfoot>

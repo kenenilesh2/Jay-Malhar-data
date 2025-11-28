@@ -1,4 +1,4 @@
-import { MaterialEntry, SupplierPayment, User } from '../types';
+import { MaterialEntry, SupplierPayment, User, ChequeEntry } from '../types';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { INITIAL_USERS } from '../constants';
 
@@ -6,7 +6,8 @@ import { INITIAL_USERS } from '../constants';
 const LS_KEYS = {
   ENTRIES: 'jay_malhar_entries',
   PAYMENTS: 'jay_malhar_payments',
-  USERS: 'jay_malhar_users'
+  USERS: 'jay_malhar_users',
+  CHEQUES: 'jay_malhar_cheques'
 };
 
 // Helper to log errors safely
@@ -29,6 +30,126 @@ const safeJsonParse = <T>(jsonString: string | null, fallback: T): T => {
   } catch (e) {
     console.warn("Failed to parse local storage data, using fallback:", e);
     return fallback;
+  }
+};
+
+// --- FILE UPLOAD (For Cheques) ---
+export const uploadChequeFile = async (file: File): Promise<string | null> => {
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('cheques')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error("Upload Error:", uploadError);
+        throw uploadError;
+      }
+
+      // Get Public URL
+      const { data } = supabase.storage.from('cheques').getPublicUrl(filePath);
+      return data.publicUrl;
+    } catch (e) {
+      console.error("File upload failed:", e);
+      throw e;
+    }
+  } else {
+    console.warn("Supabase not configured. File upload is simulated.");
+    // In local mode, we can't easily store files. We'll return a fake URL or nothing.
+    return null;
+  }
+};
+
+// --- CHEQUES ---
+export const addCheque = async (cheque: Omit<ChequeEntry, 'id' | 'timestamp'>): Promise<ChequeEntry> => {
+  if (isSupabaseConfigured() && supabase) {
+    const { data, error } = await supabase
+      .from('cheque_entries')
+      .insert([{
+        date: cheque.date,
+        party_name: cheque.partyName,
+        cheque_number: cheque.chequeNumber,
+        bank_name: cheque.bankName,
+        amount: cheque.amount,
+        status: cheque.status,
+        file_url: cheque.fileUrl,
+        created_by: cheque.createdBy
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      logSupabaseError('addCheque', error);
+      throw error;
+    }
+
+    return {
+      ...cheque,
+      id: data.id,
+      timestamp: new Date(data.created_at).getTime()
+    };
+  } else {
+    const newCheque: ChequeEntry = {
+      ...cheque,
+      id: Math.random().toString(36).substr(2, 9),
+      timestamp: Date.now()
+    };
+    const current = await getCheques();
+    localStorage.setItem(LS_KEYS.CHEQUES, JSON.stringify([...current, newCheque]));
+    return newCheque;
+  }
+};
+
+export const getCheques = async (): Promise<ChequeEntry[]> => {
+  if (isSupabaseConfigured() && supabase) {
+    const { data, error } = await supabase.from('cheque_entries').select('*').order('date', { ascending: false });
+    
+    if (error) {
+      logSupabaseError('getCheques', error);
+      return [];
+    }
+
+    return data.map((d: any) => ({
+      id: d.id,
+      date: d.date,
+      partyName: d.party_name,
+      chequeNumber: d.cheque_number,
+      bankName: d.bank_name,
+      amount: Number(d.amount),
+      status: d.status,
+      fileUrl: d.file_url,
+      createdBy: d.created_by,
+      timestamp: new Date(d.created_at).getTime()
+    }));
+  } else {
+    const s = localStorage.getItem(LS_KEYS.CHEQUES);
+    return safeJsonParse(s, []);
+  }
+};
+
+export const deleteCheque = async (id: string): Promise<void> => {
+  if (isSupabaseConfigured() && supabase) {
+    const { error, count } = await supabase
+      .from('cheque_entries')
+      .delete({ count: 'exact' })
+      .eq('id', id);
+
+    if (error) {
+      logSupabaseError('deleteCheque', error);
+      throw error;
+    }
+
+    if (count === 0) {
+      throw new Error("ACCESS DENIED: The database blocked this deletion.");
+    }
+  } else {
+    const current = await getCheques();
+    const filtered = current.filter(c => c.id !== id);
+    localStorage.setItem(LS_KEYS.CHEQUES, JSON.stringify(filtered));
   }
 };
 

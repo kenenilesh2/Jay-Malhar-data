@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MaterialType, MaterialEntry } from '../types';
 import { MATERIALS_LIST, UNITS, SITE_NAME, PREDEFINED_VEHICLES } from '../constants';
 import { generateChallanNumber } from '../services/utils';
@@ -43,6 +43,20 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
       });
     }
   }, [initialData]);
+
+  const availableVehicles = useMemo(() => {
+    return PREDEFINED_VEHICLES.filter(v => v.materials.includes(formData.material as MaterialType));
+  }, [formData.material]);
+
+  // Reset vehicle if material changes and current vehicle is not valid for new material
+  useEffect(() => {
+    if (!initialData && !isCustomVehicle && formData.vehicleNumber) {
+        const isValid = availableVehicles.some(v => v.number === formData.vehicleNumber);
+        if (!isValid) {
+            setFormData(prev => ({ ...prev, vehicleNumber: '', quantity: '' }));
+        }
+    }
+  }, [formData.material, availableVehicles, initialData, isCustomVehicle]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -138,8 +152,6 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
             required
             value={formData.material}
             onChange={(e) => {
-              // Reset quantity if switching between unit types significantly? 
-              // For now just handle change.
               handleChange(e);
             }}
             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
@@ -161,9 +173,9 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
               >
                 <option value="">-- Select Vehicle --</option>
-                {PREDEFINED_VEHICLES.map(v => (
+                {availableVehicles.map(v => (
                   <option key={v.number} value={v.number}>
-                    {v.number} ({v.capacity} Brass)
+                    {v.number} {UNITS[formData.material] === 'Brass' ? `(${v.capacity} Brass)` : ''}
                   </option>
                 ))}
                 <option value="OTHER">Other / Manual Entry</option>

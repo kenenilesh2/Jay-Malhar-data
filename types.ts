@@ -51,7 +51,20 @@ export interface SupplierPayment {
   timestamp: number;
 }
 
-export type PageView = 'dashboard' | 'entries' | 'payments' | 'admin' | 'invoices';
+export interface ChequeEntry {
+  id: string;
+  date: string;
+  partyName: string;
+  chequeNumber: string;
+  bankName: string;
+  amount: number;
+  status: 'Pending' | 'Cleared' | 'Bounced';
+  fileUrl?: string; // URL to the uploaded image/pdf
+  createdBy: string;
+  timestamp: number;
+}
+
+export type PageView = 'dashboard' | 'entries' | 'payments' | 'invoices' | 'cheques' | 'admin';
 
 export type InvoiceCategory = 'Building Material' | 'Water Supply' | 'Machinery';
 

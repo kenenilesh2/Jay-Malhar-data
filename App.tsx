@@ -6,11 +6,13 @@ import EntryForm from './components/EntryForm';
 import PaymentForm from './components/PaymentForm';
 import DataTable from './components/DataTable';
 import InvoiceGenerator from './components/InvoiceGenerator';
-import { User, MaterialEntry, SupplierPayment, PageView, MaterialType, UserRole } from './types';
+import ChequeManager from './components/ChequeManager';
+import { User, MaterialEntry, SupplierPayment, PageView, MaterialType, UserRole, ChequeEntry } from './types';
 import { 
-  getEntries, getPayments, getUsers, 
+  getEntries, getPayments, getUsers, getCheques,
   addEntry, updateEntry, deleteEntry,
   addPayment, updatePayment, deletePayment,
+  addCheque, deleteCheque,
   updateUserPassword 
 } from './services/dataService';
 import { isSupabaseConfigured } from './services/supabaseClient';
@@ -27,6 +29,7 @@ function App() {
   // Data State
   const [entries, setEntries] = useState<MaterialEntry[]>([]);
   const [payments, setPayments] = useState<SupplierPayment[]>([]);
+  const [cheques, setCheques] = useState<ChequeEntry[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   
   // UI State - Forms
@@ -64,9 +67,10 @@ function App() {
   // Initial Data Load
   const loadData = useCallback(async () => {
     try {
-      const [e, p, u] = await Promise.all([getEntries(), getPayments(), getUsers()]);
+      const [e, p, c, u] = await Promise.all([getEntries(), getPayments(), getCheques(), getUsers()]);
       setEntries(e);
       setPayments(p);
+      setCheques(c);
       setUsers(u);
     } catch (err) {
       console.error("Error loading data:", err);
@@ -151,6 +155,23 @@ function App() {
       } catch (e: any) {
         console.error(e);
         alert(e.message || "Failed to delete payment. Check database permissions.");
+      }
+    }
+  };
+
+  // --- Cheque Logic ---
+  const handleAddCheque = async (chequeData: any) => {
+    await addCheque(chequeData);
+    await loadData();
+  };
+
+  const handleDeleteCheque = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this cheque entry?")) {
+      try {
+        await deleteCheque(id);
+        await loadData();
+      } catch (e: any) {
+        alert(e.message || "Failed to delete cheque.");
       }
     }
   };
@@ -277,6 +298,16 @@ function App() {
               { header: 'Notes', accessor: (i) => <span className="text-slate-500 text-xs truncate max-w-[150px] inline-block">{i.notes || '-'}</span> },
               { header: 'Added By', accessor: (i) => i.createdBy },
             ]}
+          />
+        );
+      case 'cheques':
+        return (
+          <ChequeManager 
+            currentUser={currentUser.name}
+            cheques={cheques}
+            onAddCheque={handleAddCheque}
+            onDeleteCheque={handleDeleteCheque}
+            isAdmin={isAdmin}
           />
         );
       case 'invoices':
