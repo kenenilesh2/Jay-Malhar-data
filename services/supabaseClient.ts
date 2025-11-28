@@ -4,9 +4,13 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const LS_SUPABASE_URL = 'jay_malhar_supabase_url';
 const LS_SUPABASE_KEY = 'jay_malhar_supabase_key';
 
+// Default configuration provided by user
+const DEFAULT_SUPABASE_URL = 'https://fuezuatlryjvqtwzxabb.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZXp1YXRscnlqdnF0d3p4YWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyNjgzMzQsImV4cCI6MjA3OTg0NDMzNH0._SxQK9Flc4564yVlMyzcIjjNcrC7FKt9trHP_-JisgI';
+
 // 1. Try Environment Variables first
-let supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
-let supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+let supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+let supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
 // 2. If not found in Env, check LocalStorage
 if (!supabaseUrl || !supabaseKey) {
@@ -18,7 +22,13 @@ if (!supabaseUrl || !supabaseKey) {
   }
 }
 
-// 3. Create Client
+// 3. If still not found, use Defaults (Hardcoded)
+if (!supabaseUrl || !supabaseKey) {
+  supabaseUrl = DEFAULT_SUPABASE_URL;
+  supabaseKey = DEFAULT_SUPABASE_KEY;
+}
+
+// 4. Create Client
 export const supabase: SupabaseClient | null = (supabaseUrl && supabaseKey) 
   ? createClient(supabaseUrl, supabaseKey) 
   : null;
@@ -40,8 +50,8 @@ export const clearSupabaseConfig = () => {
 
 export const getStoredSupabaseConfig = () => {
   return {
-    url: localStorage.getItem(LS_SUPABASE_URL) || '',
-    key: localStorage.getItem(LS_SUPABASE_KEY) || ''
+    url: localStorage.getItem(LS_SUPABASE_URL) || DEFAULT_SUPABASE_URL,
+    key: localStorage.getItem(LS_SUPABASE_KEY) || DEFAULT_SUPABASE_KEY
   };
 };
 

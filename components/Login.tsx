@@ -28,8 +28,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         if (data.length > 0) {
           setSelectedUsername(data[0].username);
         }
-      } catch (e) {
-        console.error("Failed to load users", e);
+      } catch (e: any) {
+        console.error("Failed to load users:", e);
+        setError(`Failed to connect to database: ${e?.message || 'Unknown error'}`);
       } finally {
         setIsLoading(false);
       }
@@ -80,8 +81,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-8">
-            <i className="fas fa-spinner fa-spin text-brand-600 text-2xl"></i>
+          <div className="flex flex-col items-center justify-center py-8">
+            <i className="fas fa-spinner fa-spin text-brand-600 text-2xl mb-2"></i>
+            <p className="text-sm text-slate-500">Connecting to database...</p>
           </div>
         ) : (
           <form onSubmit={handleLogin} className="space-y-6">
@@ -130,9 +132,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
 
             {error && (
-              <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center">
-                <i className="fas fa-exclamation-circle mr-2"></i>
-                {error}
+              <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center break-words">
+                <i className="fas fa-exclamation-circle mr-2 flex-shrink-0"></i>
+                <span>{error}</span>
               </div>
             )}
 

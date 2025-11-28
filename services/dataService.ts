@@ -9,6 +9,27 @@ const LS_KEYS = {
   USERS: 'jay_malhar_users'
 };
 
+// Helper to log errors safely
+const logSupabaseError = (context: string, error: any) => {
+  // Check for "relation does not exist" (Postgres 42P01)
+  if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+    console.warn(`[${context}] Table not found in Supabase. Please run the SQL setup script in your Supabase SQL Editor.`);
+  } else {
+    console.error(`[${context}] Error:`, JSON.stringify(error, null, 2));
+  }
+};
+
+// Safe JSON parse helper
+const safeJsonParse = <T>(jsonString: string | null, fallback: T): T => {
+  if (!jsonString) return fallback;
+  try {
+    return JSON.parse(jsonString);
+  } catch (e) {
+    console.warn("Failed to parse local storage data, using fallback:", e);
+    return fallback;
+  }
+};
+
 // --- ENTRIES ---
 
 export const addEntry = async (entry: Omit<MaterialEntry, 'id' | 'timestamp'>): Promise<MaterialEntry> => {
@@ -28,7 +49,10 @@ export const addEntry = async (entry: Omit<MaterialEntry, 'id' | 'timestamp'>): 
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      logSupabaseError('addEntry', error);
+      throw error;
+    }
     
     return {
       ...entry,
@@ -51,7 +75,13 @@ export const addEntry = async (entry: Omit<MaterialEntry, 'id' | 'timestamp'>): 
 export const getEntries = async (): Promise<MaterialEntry[]> => {
   if (isSupabaseConfigured() && supabase) {
     const { data, error } = await supabase.from('entries').select('*').order('date', { ascending: false });
-    if (error) throw error;
+    
+    if (error) {
+      logSupabaseError('getEntries', error);
+      // Return empty array instead of throwing to prevent app crash if table missing
+      return []; 
+    }
+    
     return data.map((d: any) => ({
       id: d.id,
       date: d.date,
@@ -66,7 +96,7 @@ export const getEntries = async (): Promise<MaterialEntry[]> => {
     }));
   } else {
     const s = localStorage.getItem(LS_KEYS.ENTRIES);
-    return s ? JSON.parse(s) : [];
+    return safeJsonParse(s, []);
   }
 };
 
@@ -87,7 +117,10 @@ export const addPayment = async (payment: Omit<SupplierPayment, 'id' | 'timestam
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      logSupabaseError('addPayment', error);
+      throw error;
+    }
 
     return {
       ...payment,
@@ -109,7 +142,12 @@ export const addPayment = async (payment: Omit<SupplierPayment, 'id' | 'timestam
 export const getPayments = async (): Promise<SupplierPayment[]> => {
   if (isSupabaseConfigured() && supabase) {
     const { data, error } = await supabase.from('payments').select('*').order('date', { ascending: false });
-    if (error) throw error;
+    
+    if (error) {
+      logSupabaseError('getPayments', error);
+      return [];
+    }
+
     return data.map((d: any) => ({
       id: d.id,
       date: d.date,
@@ -122,7 +160,7 @@ export const getPayments = async (): Promise<SupplierPayment[]> => {
     }));
   } else {
     const s = localStorage.getItem(LS_KEYS.PAYMENTS);
-    return s ? JSON.parse(s) : [];
+    return safeJsonParse(s, []);
   }
 };
 
@@ -132,8 +170,14 @@ export const getUsers = async (): Promise<User[]> => {
   if (isSupabaseConfigured() && supabase) {
     const { data, error } = await supabase.from('app_users').select('*').order('name');
     
+    if (error) {
+      logSupabaseError('getUsers', error);
+      // Fallback to memory constants in case of query error (e.g., table missing)
+      return INITIAL_USERS;
+    }
+    
     // Seed users if table is empty
-    if (!error && (!data || data.length === 0)) {
+    if (!data || data.length === 0) {
       console.log("Seeding initial users...");
       const seedData = INITIAL_USERS.map(u => ({
         username: u.username,
@@ -143,16 +187,11 @@ export const getUsers = async (): Promise<User[]> => {
       }));
       const { error: seedError } = await supabase.from('app_users').insert(seedData);
       if (seedError) {
-        console.error("Error seeding users:", seedError);
+        logSupabaseError('seedUsers', seedError);
       } else {
         // Return seeded users immediately
         return INITIAL_USERS;
       }
-    }
-
-    if (error) {
-      console.error("Error fetching users from Supabase:", error);
-      return INITIAL_USERS; // Fallback to memory constants in case of query error
     }
     
     return data.map((d: any) => ({
@@ -169,7 +208,7 @@ export const getUsers = async (): Promise<User[]> => {
       localStorage.setItem(LS_KEYS.USERS, JSON.stringify(INITIAL_USERS));
       return INITIAL_USERS;
     }
-    return JSON.parse(s);
+    return safeJsonParse(s, INITIAL_USERS);
   }
 };
 
@@ -181,7 +220,7 @@ export const updateUserPassword = async (username: string, newPass: string): Pro
       .eq('username', username);
     
     if (error) {
-      console.error("Error updating password in Supabase:", error);
+      logSupabaseError('updateUserPassword', error);
       return false;
     }
     return true;
