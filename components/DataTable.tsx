@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { generateChallanPDF } from '../services/pdfService';
+import { MaterialEntry } from '../types';
 
 interface Column<T> {
   header: string;
@@ -89,6 +91,13 @@ const DataTable = <T extends { id: string }>({
     document.body.removeChild(link);
   };
 
+  const handlePrint = (item: T) => {
+    // Check if it's a material entry by looking for challanNumber
+    if ((item as any).challanNumber) {
+      generateChallanPDF(item as unknown as MaterialEntry);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -156,7 +165,7 @@ const DataTable = <T extends { id: string }>({
               {columns.map((col, idx) => (
                 <th key={idx} className="px-6 py-4">{col.header}</th>
               ))}
-              {(onEdit || onDelete) && <th className="px-6 py-4 text-right">Actions</th>}
+              <th className="px-6 py-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -168,35 +177,44 @@ const DataTable = <T extends { id: string }>({
                       {col.accessor(item)}
                     </td>
                   ))}
-                  {(onEdit || onDelete) && (
-                    <td className="px-6 py-4 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end space-x-2">
-                        {onEdit && (
-                          <button 
-                            onClick={() => onEdit(item)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Edit"
-                          >
-                            <i className="fas fa-edit"></i>
-                          </button>
-                        )}
-                        {onDelete && (
-                          <button 
-                            onClick={() => onDelete(item)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <i className="fas fa-trash-alt"></i>
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  )}
+                  <td className="px-6 py-4 text-right whitespace-nowrap">
+                    <div className="flex items-center justify-end space-x-2">
+                       {/* Print Button if item looks like an entry */}
+                       {(item as any).challanNumber && (
+                        <button 
+                          onClick={() => handlePrint(item)}
+                          className="p-1.5 text-slate-500 hover:bg-slate-100 rounded transition-colors"
+                          title="Print Challan"
+                        >
+                          <i className="fas fa-print"></i>
+                        </button>
+                       )}
+
+                      {onEdit && (
+                        <button 
+                          onClick={() => onEdit(item)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Edit"
+                        >
+                          <i className="fas fa-edit"></i>
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button 
+                          onClick={() => onDelete(item)}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Delete"
+                        >
+                          <i className="fas fa-trash-alt"></i>
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={columns.length + (onEdit || onDelete ? 1 : 0)} className="px-6 py-12 text-center text-slate-400">
+                <td colSpan={columns.length + 1} className="px-6 py-12 text-center text-slate-400">
                   <div className="flex flex-col items-center">
                     <i className="far fa-folder-open text-3xl mb-3 opacity-50"></i>
                     <p>No records found.</p>

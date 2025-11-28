@@ -50,6 +50,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
           <NavItem page="dashboard" icon="fa-chart-line" label="Dashboard" />
           <NavItem page="entries" icon="fa-truck-loading" label="Material Entries" />
           <NavItem page="payments" icon="fa-money-bill-wave" label="Payments" />
+          <NavItem page="invoices" icon="fa-file-invoice-dollar" label="Invoices & Reports" />
           <NavItem page="admin" icon="fa-users-cog" label="User Management" />
         </nav>
 
@@ -94,6 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
             <NavItem page="dashboard" icon="fa-chart-line" label="Dashboard" />
             <NavItem page="entries" icon="fa-truck-loading" label="Material Entries" />
             <NavItem page="payments" icon="fa-money-bill-wave" label="Payments" />
+            <NavItem page="invoices" icon="fa-file-invoice-dollar" label="Invoices" />
             <NavItem page="admin" icon="fa-users-cog" label="User Management" />
             <button 
               onClick={onLogout}

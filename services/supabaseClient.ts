@@ -95,11 +95,25 @@ create table if not exists users (
   created_at timestamptz default now()
 );
 
--- RLS Policies (Enable public access for this app)
+-- 4. SCHEMA REPAIR (Run this if you get "column not found" errors)
+alter table entries add column if not exists material text;
+alter table entries add column if not exists challan_number text;
+alter table entries add column if not exists vehicle_number text;
+alter table entries add column if not exists site_name text;
+
+-- 5. RLS POLICIES (REQUIRED FOR DELETE TO WORK) --
+-- Run this block if you are unable to delete entries --
 alter table entries enable row level security;
 alter table payments enable row level security;
 alter table users enable row level security;
 
+-- Drop existing policies to prevent conflicts
+drop policy if exists "Public access entries" on entries;
+drop policy if exists "Public access payments" on payments;
+drop policy if exists "Public access users" on users;
+
+-- Allow ALL operations (Insert, Update, DELETE, Select) for public users
+-- (Since we manage auth in the app, we trust the client key for now)
 create policy "Public access entries" on entries for all using (true) with check (true);
 create policy "Public access payments" on payments for all using (true) with check (true);
 create policy "Public access users" on users for all using (true) with check (true);

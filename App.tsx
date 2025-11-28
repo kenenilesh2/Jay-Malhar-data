@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard';
 import EntryForm from './components/EntryForm';
 import PaymentForm from './components/PaymentForm';
 import DataTable from './components/DataTable';
+import InvoiceGenerator from './components/InvoiceGenerator';
 import { User, MaterialEntry, SupplierPayment, PageView, MaterialType, UserRole } from './types';
 import { 
   getEntries, getPayments, getUsers, 
@@ -13,6 +14,8 @@ import {
   updateUserPassword 
 } from './services/dataService';
 import { isSupabaseConfigured } from './services/supabaseClient';
+
+const SESSION_KEY = 'jay_malhar_active_session';
 
 function App() {
   // Auth State
@@ -40,6 +43,23 @@ function App() {
   // Admin UI State
   const [adminSelectedUser, setAdminSelectedUser] = useState<string>('');
   const [newPassword, setNewPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  // Restore Session on Mount
+  useEffect(() => {
+    const savedSession = localStorage.getItem(SESSION_KEY);
+    if (savedSession) {
+      try {
+        const user = JSON.parse(savedSession);
+        if (user && user.username) {
+          setCurrentUser(user);
+        }
+      } catch (e) {
+        console.error("Failed to restore session", e);
+        localStorage.removeItem(SESSION_KEY);
+      }
+    }
+  }, []);
 
   // Initial Data Load
   const loadData = useCallback(async () => {
@@ -62,10 +82,12 @@ function App() {
   // Handlers
   const handleLogin = (user: User) => {
     setCurrentUser(user);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
     setPage('dashboard');
   };
 
   const handleLogout = () => {
+    localStorage.removeItem(SESSION_KEY);
     setCurrentUser(null);
     setEntries([]);
     setPayments([]);
@@ -92,12 +114,13 @@ function App() {
   };
 
   const handleDeleteEntry = async (entry: MaterialEntry) => {
-    if (window.confirm(`Are you sure you want to delete entry for ${entry.material}?`)) {
+    if (window.confirm(`Are you sure you want to delete Challan: ${entry.challanNumber}?`)) {
       try {
         await deleteEntry(entry.id);
         await loadData();
-      } catch (e) {
-        alert("Failed to delete entry");
+      } catch (e: any) {
+        console.error(e);
+        alert(e.message || "Failed to delete entry. Check database permissions.");
       }
     }
   };
@@ -122,11 +145,12 @@ function App() {
 
   const handleDeletePayment = async (payment: SupplierPayment) => {
     if (window.confirm(`Are you sure you want to delete payment of ₹${payment.amount}?`)) {
-       try {
+      try {
         await deletePayment(payment.id);
         await loadData();
-      } catch (e) {
-        alert("Failed to delete payment");
+      } catch (e: any) {
+        console.error(e);
+        alert(e.message || "Failed to delete payment. Check database permissions.");
       }
     }
   };
@@ -140,6 +164,7 @@ function App() {
 
   const handleChangePassword = async () => {
     if (!adminSelectedUser || !newPassword) return;
+    setIsUpdatingPassword(true);
     try {
       const success = await updateUserPassword(adminSelectedUser, newPassword);
       if (success) {
@@ -148,11 +173,13 @@ function App() {
         const updatedUsers = await getUsers();
         setUsers(updatedUsers);
       } else {
-        alert('Failed to update password');
+        alert('Failed to update password. Please check if the user exists in database.');
       }
     } catch (e) {
       console.error(e);
       alert('Error updating password');
+    } finally {
+      setIsUpdatingPassword(false);
     }
   };
 
@@ -215,7 +242,7 @@ function App() {
             }}
             enableExport={true}
             enableDateFilter={true}
-            // Pass edit/delete handlers ONLY if admin
+            // Pass handlers ONLY if admin
             onEdit={isAdmin ? handleEditEntry : undefined}
             onDelete={isAdmin ? handleDeleteEntry : undefined}
             columns={[
@@ -239,7 +266,7 @@ function App() {
             }}
             enableExport={true}
             enableDateFilter={true}
-            // Pass edit/delete handlers ONLY if admin
+            // Pass handlers ONLY if admin
             onEdit={isAdmin ? handleEditPayment : undefined}
             onDelete={isAdmin ? handleDeletePayment : undefined}
             columns={[
@@ -252,6 +279,8 @@ function App() {
             ]}
           />
         );
+      case 'invoices':
+        return <InvoiceGenerator entries={entries} />;
       case 'admin':
         if (!isAdmin) return <div>Access Denied</div>;
         return (
@@ -287,9 +316,11 @@ function App() {
               </div>
               <button 
                 onClick={handleChangePassword}
-                className="mt-4 bg-brand-600 text-white px-4 py-2 rounded hover:bg-brand-700"
+                disabled={isUpdatingPassword}
+                className="mt-4 bg-brand-600 text-white px-4 py-2 rounded hover:bg-brand-700 disabled:opacity-50 flex items-center"
               >
-                Update Password
+                 {isUpdatingPassword && <i className="fas fa-spinner fa-spin mr-2"></i>}
+                 Update Password
               </button>
             </div>
 

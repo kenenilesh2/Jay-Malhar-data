@@ -49,8 +49,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, initialData, onS
         createdBy: initialData ? initialData.createdBy : currentUser
       });
     } catch (err) {
-      console.error(err);
-      alert('Failed to save payment');
+      console.error("Payment Save Error:", JSON.stringify(err, null, 2));
+      alert('Failed to save payment. See console for details.');
     } finally {
       setLoading(false);
     }

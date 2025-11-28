@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MaterialType, MaterialEntry } from '../types';
-import { MATERIALS_LIST, UNITS, SITE_NAME } from '../constants';
+import { MATERIALS_LIST, UNITS, SITE_NAME, PREDEFINED_VEHICLES } from '../constants';
+import { generateChallanNumber } from '../services/utils';
+import { generateChallanPDF } from '../services/pdfService';
 
 interface EntryFormProps {
   currentUser: string;
@@ -11,6 +13,8 @@ interface EntryFormProps {
 
 const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmit, onCancel }) => {
   const [loading, setLoading] = useState(false);
+  const [isCustomVehicle, setIsCustomVehicle] = useState(false);
+  
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     challanNumber: '',
@@ -21,6 +25,9 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
 
   useEffect(() => {
     if (initialData) {
+      // Check if the initial vehicle is in our predefined list
+      const isPredefined = PREDEFINED_VEHICLES.some(v => v.number === initialData.vehicleNumber);
+      
       setFormData({
         date: initialData.date,
         challanNumber: initialData.challanNumber,
@@ -28,12 +35,39 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
         quantity: String(initialData.quantity),
         vehicleNumber: initialData.vehicleNumber || '',
       });
+      setIsCustomVehicle(!isPredefined && !!initialData.vehicleNumber);
+    } else {
+      // Auto-generate challan number for new entries
+      generateChallanNumber().then(num => {
+        setFormData(prev => ({ ...prev, challanNumber: num }));
+      });
     }
   }, [initialData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleVehicleSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    
+    if (val === 'OTHER') {
+      setIsCustomVehicle(true);
+      setFormData(prev => ({ ...prev, vehicleNumber: '' }));
+    } else {
+      setIsCustomVehicle(false);
+      
+      // Auto-fill quantity if unit is Brass and vehicle is found
+      const vehicle = PREDEFINED_VEHICLES.find(v => v.number === val);
+      const currentUnit = UNITS[formData.material];
+      
+      setFormData(prev => ({ 
+        ...prev, 
+        vehicleNumber: val,
+        quantity: (vehicle && currentUnit === 'Brass') ? String(vehicle.capacity) : prev.quantity
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,8 +86,8 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
         createdBy: initialData ? initialData.createdBy : currentUser // Preserve original creator on edit
       });
     } catch (err) {
-      console.error(err);
-      alert('Failed to save entry');
+      console.error("Entry Save Error:", JSON.stringify(err, null, 2));
+      alert('Failed to save entry. See console for details.');
     } finally {
       setLoading(false);
     }
@@ -89,7 +123,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
               type="text"
               name="challanNumber"
               required
-              placeholder="e.g. CH-1024"
+              placeholder="e.g. JME/2024/001"
               value={formData.challanNumber}
               onChange={handleChange}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
@@ -103,7 +137,11 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
             name="material"
             required
             value={formData.material}
-            onChange={handleChange}
+            onChange={(e) => {
+              // Reset quantity if switching between unit types significantly? 
+              // For now just handle change.
+              handleChange(e);
+            }}
             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
           >
             {MATERIALS_LIST.map(m => (
@@ -113,6 +151,46 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Number *</label>
+            {!isCustomVehicle ? (
+              <select
+                required
+                value={formData.vehicleNumber}
+                onChange={handleVehicleSelect}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+              >
+                <option value="">-- Select Vehicle --</option>
+                {PREDEFINED_VEHICLES.map(v => (
+                  <option key={v.number} value={v.number}>
+                    {v.number} ({v.capacity} Brass)
+                  </option>
+                ))}
+                <option value="OTHER">Other / Manual Entry</option>
+              </select>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  name="vehicleNumber"
+                  required
+                  placeholder="Enter custom vehicle no."
+                  value={formData.vehicleNumber}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                />
+                <button 
+                  type="button"
+                  onClick={() => { setIsCustomVehicle(false); setFormData(p => ({...p, vehicleNumber: ''})); }}
+                  className="px-3 py-2 bg-slate-100 text-slate-600 rounded hover:bg-slate-200"
+                  title="Back to list"
+                >
+                  <i className="fas fa-list"></i>
+                </button>
+              </div>
+            )}
+          </div>
+          
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Quantity ({UNITS[formData.material]}) *
@@ -128,21 +206,19 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Number *</label>
-            <input
-              type="text"
-              name="vehicleNumber"
-              required
-              placeholder="MH-XX-XXXX"
-              value={formData.vehicleNumber}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
-            />
-          </div>
         </div>
 
         <div className="pt-4 flex justify-end space-x-3">
+           {initialData && (
+             <button
+              type="button"
+              onClick={() => generateChallanPDF(initialData)}
+              className="mr-auto px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium transition-colors"
+            >
+              <i className="fas fa-print mr-2"></i> Print Challan
+            </button>
+          )}
+          
           <button
             type="button"
             onClick={onCancel}

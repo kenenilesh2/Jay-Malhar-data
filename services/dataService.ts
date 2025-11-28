@@ -14,6 +14,8 @@ const logSupabaseError = (context: string, error: any) => {
   // Check for "relation does not exist" (Postgres 42P01 or PGRST205)
   if (error?.code === '42P01' || error?.code === 'PGRST205' || error?.message?.includes('does not exist')) {
     console.warn(`[${context}] Table not found in Supabase. Please run the SQL setup script in your Supabase SQL Editor.`);
+  } else if (error?.code === 'PGRST204') {
+    console.warn(`[${context}] Column mismatch in Supabase (PGRST204). A required column (e.g., 'material') is missing from the table. Run the Schema Repair SQL script in services/supabaseClient.ts.`);
   } else {
     console.error(`[${context}] Error:`, JSON.stringify(error, null, 2));
   }
@@ -103,11 +105,23 @@ export const updateEntry = async (id: string, entry: Partial<MaterialEntry>): Pr
 
 export const deleteEntry = async (id: string): Promise<void> => {
   if (isSupabaseConfigured() && supabase) {
-    const { error } = await supabase.from('entries').delete().eq('id', id);
+    // Use count: 'exact' to strictly verify if the database actually deleted the row.
+    // Standard .delete() might return success (204) even if RLS blocked it.
+    const { error, count } = await supabase
+      .from('entries')
+      .delete({ count: 'exact' })
+      .eq('id', id);
+
     if (error) {
       logSupabaseError('deleteEntry', error);
       throw error;
     }
+
+    // If count is 0, it means nothing was deleted (likely due to RLS permissions)
+    if (count === 0) {
+      throw new Error("ACCESS DENIED: The database blocked this deletion. Please run the 'ENABLE DELETE PERMISSIONS' SQL script in your Supabase Dashboard.");
+    }
+
   } else {
     const current = await getEntries();
     const filtered = current.filter(e => e.id !== id);
@@ -210,11 +224,20 @@ export const updatePayment = async (id: string, payment: Partial<SupplierPayment
 
 export const deletePayment = async (id: string): Promise<void> => {
   if (isSupabaseConfigured() && supabase) {
-    const { error } = await supabase.from('payments').delete().eq('id', id);
+    const { error, count } = await supabase
+      .from('payments')
+      .delete({ count: 'exact' })
+      .eq('id', id);
+
     if (error) {
       logSupabaseError('deletePayment', error);
       throw error;
     }
+    
+    if (count === 0) {
+      throw new Error("ACCESS DENIED: The database blocked this deletion. Please run the 'ENABLE DELETE PERMISSIONS' SQL script in your Supabase Dashboard.");
+    }
+
   } else {
     const current = await getPayments();
     const filtered = current.filter(p => p.id !== id);

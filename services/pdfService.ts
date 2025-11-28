@@ -1,0 +1,146 @@
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { MaterialEntry, InvoiceItem, InvoiceCategory } from '../types';
+import { GST_RATES, SITE_NAME, UNITS } from '../constants';
+
+// PDF Safe Currency Formatter (Avoids unicode symbols like ₹ which might break in standard fonts)
+const formatCurrencyPDF = (amount: number) => {
+  return `Rs. ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+// Helper to add header
+const addHeader = (doc: jsPDF, title: string) => {
+  doc.setFillColor(14, 165, 233); // Brand color
+  doc.rect(0, 0, 210, 40, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text("JAY MALHAR ENTERPRISES", 105, 18, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text("Supply Chain & Material Management", 105, 26, { align: 'center' });
+  
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(16);
+  doc.text(title, 105, 55, { align: 'center' });
+};
+
+export const generateChallanPDF = (entry: MaterialEntry) => {
+  const doc = new jsPDF();
+  
+  addHeader(doc, "DELIVERY CHALLAN");
+  
+  // Details
+  doc.setFontSize(11);
+  const startY = 70;
+  
+  doc.text(`Challan No: ${entry.challanNumber}`, 15, startY);
+  doc.text(`Date: ${new Date(entry.date).toLocaleDateString()}`, 140, startY);
+  
+  doc.text(`Site Name: ${entry.siteName}`, 15, startY + 10);
+  doc.text(`Vehicle No: ${entry.vehicleNumber || 'N/A'}`, 140, startY + 10);
+  
+  // Table
+  autoTable(doc, {
+    startY: startY + 25,
+    head: [['Sr. No.', 'Description of Material', 'Quantity', 'Unit']],
+    body: [
+      ['1', entry.material, entry.quantity.toString(), entry.unit]
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: [14, 165, 233] },
+    columnStyles: {
+      2: { halign: 'right' }
+    }
+  });
+  
+  // Footer
+  const finalY = (doc as any).lastAutoTable.finalY + 40;
+  doc.text("Receiver's Signature", 15, finalY);
+  doc.text("For Jay Malhar Enterprises", 140, finalY);
+  
+  doc.save(`Challan_${entry.challanNumber}.pdf`);
+};
+
+export const generateMonthlyInvoicePDF = (
+  month: string, 
+  category: InvoiceCategory, 
+  items: InvoiceItem[],
+  totalBase: number,
+  totalTax: number,
+  grandTotal: number
+) => {
+  const doc = new jsPDF();
+  
+  addHeader(doc, "TAX INVOICE");
+  
+  doc.setFontSize(10);
+  doc.text(`Invoice Month: ${month}`, 15, 65);
+  doc.text(`Category: ${category}`, 15, 70);
+  doc.text(`Site: ${SITE_NAME}`, 140, 65);
+  
+  const tableHead = [['Date', 'Challan', 'Vehicle', 'Description', 'Qty', 'Rate', 'Amount']];
+  const tableBody = items.map(item => [
+    item.date,
+    item.challanNumber,
+    item.vehicleNumber,
+    item.description,
+    item.quantity.toString(), // Allows for 6.56, 6.2 etc.
+    formatCurrencyPDF(item.rate),
+    formatCurrencyPDF(item.amount)
+  ]);
+  
+  autoTable(doc, {
+    startY: 75,
+    head: tableHead,
+    body: tableBody,
+    theme: 'striped',
+    headStyles: { fillColor: [44, 62, 80] },
+    styles: { fontSize: 9, cellPadding: 2 },
+    columnStyles: {
+      0: { cellWidth: 22 }, // Date
+      1: { cellWidth: 28 }, // Challan
+      2: { cellWidth: 25 }, // Vehicle
+      3: { cellWidth: 'auto' }, // Description
+      4: { cellWidth: 15, halign: 'right' }, // Qty
+      5: { cellWidth: 25, halign: 'right' }, // Rate
+      6: { cellWidth: 35, halign: 'right' }, // Amount
+    },
+  });
+  
+  // Summary
+  const taxes = GST_RATES[category];
+  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  const labelX = 130;
+  const valueX = 195;
+  
+  doc.setFontSize(10);
+  doc.text(`Sub Total:`, labelX, finalY);
+  doc.text(formatCurrencyPDF(totalBase), valueX, finalY, { align: 'right' });
+  
+  if (category !== 'Water Supply') {
+    doc.text(`CGST (${taxes.cgst}%):`, labelX, finalY + 6);
+    doc.text(formatCurrencyPDF(totalBase * (taxes.cgst / 100)), valueX, finalY + 6, { align: 'right' });
+    
+    doc.text(`SGST (${taxes.sgst}%):`, labelX, finalY + 12);
+    doc.text(formatCurrencyPDF(totalBase * (taxes.sgst / 100)), valueX, finalY + 12, { align: 'right' });
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Grand Total:`, labelX, finalY + 22);
+    doc.text(formatCurrencyPDF(grandTotal), valueX, finalY + 22, { align: 'right' });
+  } else {
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Grand Total:`, labelX, finalY + 10);
+    doc.text(formatCurrencyPDF(grandTotal), valueX, finalY + 10, { align: 'right' });
+  }
+  
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text("Terms & Conditions: E.&O.E. 1. Goods once sold will not be taken back. 2. Interest @ 24% p.a. will be charged if bill is not paid within due date.", 15, 280);
+  
+  doc.save(`Invoice_${category}_${month}.pdf`);
+};

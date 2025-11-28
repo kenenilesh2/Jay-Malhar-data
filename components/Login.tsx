@@ -7,6 +7,8 @@ interface LoginProps {
   onLogin: (user: User) => void;
 }
 
+const SAVED_CREDS_KEY = 'jay_malhar_saved_passwords';
+
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUsername, setSelectedUsername] = useState('');
@@ -14,6 +16,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Store the map of usernames to saved passwords
+  const [savedCreds, setSavedCreds] = useState<Record<string, string>>({});
 
   // Config Modal State
   const [showConfig, setShowConfig] = useState(false);
@@ -21,12 +26,32 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [configKey, setConfigKey] = useState('');
 
   useEffect(() => {
-    const loadUsers = async () => {
+    const loadData = async () => {
+      // 1. Load Users
       try {
         const data = await getUsers();
         setUsers(data);
+        
+        // 2. Load Saved Credentials from LocalStorage
+        const saved = localStorage.getItem(SAVED_CREDS_KEY);
+        let creds: Record<string, string> = {};
+        if (saved) {
+          try {
+            creds = JSON.parse(saved);
+            setSavedCreds(creds);
+          } catch (e) {
+            console.error("Failed to parse saved credentials", e);
+          }
+        }
+
+        // 3. Set Default Selection
         if (data.length > 0) {
-          setSelectedUsername(data[0].username);
+          const defaultUser = data[0].username;
+          setSelectedUsername(defaultUser);
+          // Auto-fill password for default user if exists
+          if (creds[defaultUser]) {
+            setPassword(creds[defaultUser]);
+          }
         }
       } catch (e: any) {
         console.error("Failed to load users:", e);
@@ -35,7 +60,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         setIsLoading(false);
       }
     };
-    loadUsers();
+    loadData();
 
     // Load stored config for the modal
     const stored = getStoredSupabaseConfig();
@@ -43,11 +68,25 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setConfigKey(stored.key);
   }, []);
 
+  // Effect to auto-fill password when user selection changes
+  useEffect(() => {
+    if (selectedUsername && savedCreds[selectedUsername]) {
+      setPassword(savedCreds[selectedUsername]);
+    } else {
+      setPassword(''); // Clear if no saved password
+    }
+  }, [selectedUsername, savedCreds]);
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const user = users.find(u => u.username === selectedUsername);
 
     if (user && user.passwordHash === password) {
+      // Login Success: Save the credential for next time
+      const newCreds = { ...savedCreds, [selectedUsername]: password };
+      setSavedCreds(newCreds);
+      localStorage.setItem(SAVED_CREDS_KEY, JSON.stringify(newCreds));
+      
       onLogin(user);
     } else {
       setError('Invalid password. Please try again.');
@@ -129,6 +168,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                 </button>
               </div>
+              {savedCreds[selectedUsername] && (
+                <p className="text-xs text-green-600 mt-1 ml-1">
+                  <i className="fas fa-check-circle mr-1"></i>
+                  Auto-filled from saved login
+                </p>
+              )}
             </div>
 
             {error && (
