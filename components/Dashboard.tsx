@@ -7,11 +7,12 @@ interface DashboardProps {
   entries: MaterialEntry[];
   payments: SupplierPayment[];
   onFilterRequest: (material?: MaterialType) => void;
+  onNavigatePayments: () => void;
 }
 
 const COLORS = ['#0ea5e9', '#22c55e', '#eab308', '#f97316', '#ef4444', '#8b5cf6', '#ec4899'];
 
-const Dashboard: React.FC<DashboardProps> = ({ entries, payments, onFilterRequest }) => {
+const Dashboard: React.FC<DashboardProps> = ({ entries, payments, onFilterRequest, onNavigatePayments }) => {
   const [aiQuery, setAiQuery] = useState('');
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isThinking, setIsThinking] = useState(false);
@@ -95,13 +96,16 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, payments, onFilterReques
           <p className="text-xs text-slate-400 mt-3">All material challans</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div 
+          onClick={onNavigatePayments}
+          className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-md transition-shadow group"
+        >
            <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-500">Total Paid</p>
               <p className="text-2xl font-bold text-green-600 mt-1">₹ {totalPayments.toLocaleString()}</p>
             </div>
-            <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center text-green-500">
+            <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center text-green-500 group-hover:bg-green-100 transition-colors">
               <i className="fas fa-rupee-sign"></i>
             </div>
           </div>

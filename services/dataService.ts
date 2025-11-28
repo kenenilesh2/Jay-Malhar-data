@@ -42,7 +42,7 @@ export const addEntry = async (entry: Omit<MaterialEntry, 'id' | 'timestamp'>): 
       id: Math.random().toString(36).substr(2, 9),
       timestamp: Date.now()
     };
-    const current = getLocalEntries();
+    const current = await getEntries(); // await in case we switch implementation later
     localStorage.setItem(LS_KEYS.ENTRIES, JSON.stringify([...current, newEntry]));
     return newEntry;
   }
@@ -65,13 +65,9 @@ export const getEntries = async (): Promise<MaterialEntry[]> => {
       timestamp: new Date(d.created_at).getTime()
     }));
   } else {
-    return getLocalEntries();
+    const s = localStorage.getItem(LS_KEYS.ENTRIES);
+    return s ? JSON.parse(s) : [];
   }
-};
-
-const getLocalEntries = (): MaterialEntry[] => {
-  const s = localStorage.getItem(LS_KEYS.ENTRIES);
-  return s ? JSON.parse(s) : [];
 };
 
 // --- PAYMENTS ---
@@ -104,7 +100,7 @@ export const addPayment = async (payment: Omit<SupplierPayment, 'id' | 'timestam
       id: Math.random().toString(36).substr(2, 9),
       timestamp: Date.now()
     };
-    const current = getLocalPayments();
+    const current = await getPayments();
     localStorage.setItem(LS_KEYS.PAYMENTS, JSON.stringify([...current, newPayment]));
     return newPayment;
   }
@@ -125,33 +121,69 @@ export const getPayments = async (): Promise<SupplierPayment[]> => {
       timestamp: new Date(d.created_at).getTime()
     }));
   } else {
-    return getLocalPayments();
+    const s = localStorage.getItem(LS_KEYS.PAYMENTS);
+    return s ? JSON.parse(s) : [];
   }
 };
 
-const getLocalPayments = (): SupplierPayment[] => {
-  const s = localStorage.getItem(LS_KEYS.PAYMENTS);
-  return s ? JSON.parse(s) : [];
+// --- USERS ---
+
+export const getUsers = async (): Promise<User[]> => {
+  if (isSupabaseConfigured() && supabase) {
+    const { data, error } = await supabase.from('app_users').select('*');
+    
+    // Seed users if table is empty
+    if (!error && (!data || data.length === 0)) {
+      console.log("Seeding initial users...");
+      const seedData = INITIAL_USERS.map(u => ({
+        username: u.username,
+        name: u.name,
+        role: u.role,
+        password_hash: u.passwordHash
+      }));
+      const { error: seedError } = await supabase.from('app_users').insert(seedData);
+      if (seedError) console.error("Error seeding users:", seedError);
+      return INITIAL_USERS;
+    }
+
+    if (error) {
+      console.error("Error fetching users:", error);
+      return INITIAL_USERS;
+    }
+    
+    return data.map((d: any) => ({
+      id: d.id,
+      username: d.username,
+      name: d.name,
+      role: d.role,
+      passwordHash: d.password_hash
+    }));
+  } else {
+    const s = localStorage.getItem(LS_KEYS.USERS);
+    if (!s) {
+      localStorage.setItem(LS_KEYS.USERS, JSON.stringify(INITIAL_USERS));
+      return INITIAL_USERS;
+    }
+    return JSON.parse(s);
+  }
 };
 
-// --- USERS (Local only for simplicity unless Auth service is fully integrated) ---
-
-export const getUsers = (): User[] => {
-  const s = localStorage.getItem(LS_KEYS.USERS);
-  if (!s) {
-    localStorage.setItem(LS_KEYS.USERS, JSON.stringify(INITIAL_USERS));
-    return INITIAL_USERS;
+export const updateUserPassword = async (username: string, newPass: string): Promise<boolean> => {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase
+      .from('app_users')
+      .update({ password_hash: newPass })
+      .eq('username', username);
+    
+    return !error;
+  } else {
+    const users = await getUsers();
+    const index = users.findIndex(u => u.username === username);
+    if (index !== -1) {
+      users[index].passwordHash = newPass;
+      localStorage.setItem(LS_KEYS.USERS, JSON.stringify(users));
+      return true;
+    }
+    return false;
   }
-  return JSON.parse(s);
-};
-
-export const updateUserPassword = (username: string, newPass: string) => {
-  const users = getUsers();
-  const index = users.findIndex(u => u.username === username);
-  if (index !== -1) {
-    users[index].passwordHash = newPass;
-    localStorage.setItem(LS_KEYS.USERS, JSON.stringify(users));
-    return true;
-  }
-  return false;
 };

@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 /*
 -- SQL SCHEMA --
 
+-- 1. Entries Table
 create table if not exists entries (
   id uuid default gen_random_uuid() primary key,
   date date not null,
@@ -23,6 +24,7 @@ create table if not exists entries (
   created_at timestamptz default now()
 );
 
+-- 2. Payments Table
 create table if not exists payments (
   id uuid default gen_random_uuid() primary key,
   date date not null,
@@ -34,14 +36,28 @@ create table if not exists payments (
   created_at timestamptz default now()
 );
 
--- RLS Policies (Simple public access for this internal app demo, secure properly in production)
+-- 3. Users Table (Simple custom auth for this specific requirement)
+create table if not exists app_users (
+  id uuid default gen_random_uuid() primary key,
+  username text unique not null,
+  name text not null,
+  role text not null,
+  password_hash text not null,
+  created_at timestamptz default now()
+);
+
+-- RLS Policies (Simple public access for this internal app demo)
 alter table entries enable row level security;
-create policy "Public access" on entries for all using (true);
+create policy "Public access entries" on entries for all using (true);
+
 alter table payments enable row level security;
-create policy "Public access" on payments for all using (true);
+create policy "Public access payments" on payments for all using (true);
+
+alter table app_users enable row level security;
+create policy "Public access users" on app_users for all using (true);
+
 */
 
-// For this demo, we check if env vars exist. If not, the DataService will fall back to LocalStorage.
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
 

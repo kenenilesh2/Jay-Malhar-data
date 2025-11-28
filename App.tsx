@@ -19,6 +19,7 @@ function App() {
   // Data State
   const [entries, setEntries] = useState<MaterialEntry[]>([]);
   const [payments, setPayments] = useState<SupplierPayment[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   
   // UI State
   const [showEntryForm, setShowEntryForm] = useState(false);
@@ -32,9 +33,10 @@ function App() {
   // Initial Data Load
   const loadData = useCallback(async () => {
     try {
-      const [e, p] = await Promise.all([getEntries(), getPayments()]);
+      const [e, p, u] = await Promise.all([getEntries(), getPayments(), getUsers()]);
       setEntries(e);
       setPayments(p);
+      setUsers(u);
     } catch (err) {
       console.error("Error loading data:", err);
     }
@@ -75,14 +77,22 @@ function App() {
     setPage('entries');
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!adminSelectedUser || !newPassword) return;
-    const success = updateUserPassword(adminSelectedUser, newPassword);
-    if (success) {
-      alert('Password updated successfully');
-      setNewPassword('');
-    } else {
-      alert('User not found');
+    try {
+      const success = await updateUserPassword(adminSelectedUser, newPassword);
+      if (success) {
+        alert('Password updated successfully');
+        setNewPassword('');
+        // Reload users to get updated hashes if needed locally, though simple auth checks local object in Login
+        const updatedUsers = await getUsers();
+        setUsers(updatedUsers);
+      } else {
+        alert('Failed to update password');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error updating password');
     }
   };
 
@@ -119,6 +129,7 @@ function App() {
             entries={entries} 
             payments={payments} 
             onFilterRequest={handleDashboardFilter} 
+            onNavigatePayments={() => setPage('payments')}
           />
         );
       case 'entries':
@@ -157,7 +168,6 @@ function App() {
         );
       case 'admin':
         if (currentUser.role !== UserRole.ADMIN) return <div>Access Denied</div>;
-        const users = getUsers();
         return (
           <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 max-w-2xl mx-auto">
             <h2 className="text-xl font-bold mb-6 text-slate-800">Admin Settings</h2>
@@ -174,7 +184,7 @@ function App() {
                   >
                     <option value="">-- Select User --</option>
                     {users.map(u => (
-                      <option key={u.id} value={u.username}>{u.name} ({u.username})</option>
+                      <option key={u.id} value={u.username}>{u.name} ({u.role})</option>
                     ))}
                   </select>
                 </div>
