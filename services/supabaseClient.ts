@@ -1,14 +1,53 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// NOTE FOR DEVELOPER/USER:
-// To fully enable Supabase:
-// 1. Create a project at https://supabase.com
-// 2. Run the SQL below in the Supabase SQL Editor to create tables.
-// 3. Get your URL and ANON KEY from Project Settings -> API.
-// 4. Set them in a .env file or replace the empty strings below (not recommended for production).
+// Keys for LocalStorage
+const LS_SUPABASE_URL = 'jay_malhar_supabase_url';
+const LS_SUPABASE_KEY = 'jay_malhar_supabase_key';
+
+// 1. Try Environment Variables first
+let supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+let supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
+
+// 2. If not found in Env, check LocalStorage
+if (!supabaseUrl || !supabaseKey) {
+  const lsUrl = localStorage.getItem(LS_SUPABASE_URL);
+  const lsKey = localStorage.getItem(LS_SUPABASE_KEY);
+  if (lsUrl && lsKey) {
+    supabaseUrl = lsUrl;
+    supabaseKey = lsKey;
+  }
+}
+
+// 3. Create Client
+export const supabase: SupabaseClient | null = (supabaseUrl && supabaseKey) 
+  ? createClient(supabaseUrl, supabaseKey) 
+  : null;
+
+export const isSupabaseConfigured = () => !!supabase;
+
+// Helpers for UI Configuration
+export const saveSupabaseConfig = (url: string, key: string) => {
+  localStorage.setItem(LS_SUPABASE_URL, url);
+  localStorage.setItem(LS_SUPABASE_KEY, key);
+  window.location.reload(); // Reload to re-initialize client
+};
+
+export const clearSupabaseConfig = () => {
+  localStorage.removeItem(LS_SUPABASE_URL);
+  localStorage.removeItem(LS_SUPABASE_KEY);
+  window.location.reload();
+};
+
+export const getStoredSupabaseConfig = () => {
+  return {
+    url: localStorage.getItem(LS_SUPABASE_URL) || '',
+    key: localStorage.getItem(LS_SUPABASE_KEY) || ''
+  };
+};
 
 /*
--- SQL SCHEMA --
+-- SQL SCHEMA FOR SUPABASE --
+-- Run this in Supabase SQL Editor to set up your tables --
 
 -- 1. Entries Table
 create table if not exists entries (
@@ -36,7 +75,7 @@ create table if not exists payments (
   created_at timestamptz default now()
 );
 
--- 3. Users Table (Simple custom auth for this specific requirement)
+-- 3. Users Table
 create table if not exists app_users (
   id uuid default gen_random_uuid() primary key,
   username text unique not null,
@@ -46,23 +85,12 @@ create table if not exists app_users (
   created_at timestamptz default now()
 );
 
--- RLS Policies (Simple public access for this internal app demo)
+-- RLS Policies (Enable public access for this app)
 alter table entries enable row level security;
-create policy "Public access entries" on entries for all using (true);
-
 alter table payments enable row level security;
-create policy "Public access payments" on payments for all using (true);
-
 alter table app_users enable row level security;
-create policy "Public access users" on app_users for all using (true);
 
+create policy "Public access entries" on entries for all using (true) with check (true);
+create policy "Public access payments" on payments for all using (true) with check (true);
+create policy "Public access users" on app_users for all using (true) with check (true);
 */
-
-const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || '';
-
-export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
-  : null;
-
-export const isSupabaseConfigured = () => !!supabase;

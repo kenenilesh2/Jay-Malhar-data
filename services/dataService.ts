@@ -130,7 +130,7 @@ export const getPayments = async (): Promise<SupplierPayment[]> => {
 
 export const getUsers = async (): Promise<User[]> => {
   if (isSupabaseConfigured() && supabase) {
-    const { data, error } = await supabase.from('app_users').select('*');
+    const { data, error } = await supabase.from('app_users').select('*').order('name');
     
     // Seed users if table is empty
     if (!error && (!data || data.length === 0)) {
@@ -142,13 +142,17 @@ export const getUsers = async (): Promise<User[]> => {
         password_hash: u.passwordHash
       }));
       const { error: seedError } = await supabase.from('app_users').insert(seedData);
-      if (seedError) console.error("Error seeding users:", seedError);
-      return INITIAL_USERS;
+      if (seedError) {
+        console.error("Error seeding users:", seedError);
+      } else {
+        // Return seeded users immediately
+        return INITIAL_USERS;
+      }
     }
 
     if (error) {
-      console.error("Error fetching users:", error);
-      return INITIAL_USERS;
+      console.error("Error fetching users from Supabase:", error);
+      return INITIAL_USERS; // Fallback to memory constants in case of query error
     }
     
     return data.map((d: any) => ({
@@ -159,6 +163,7 @@ export const getUsers = async (): Promise<User[]> => {
       passwordHash: d.password_hash
     }));
   } else {
+    // Local Storage logic
     const s = localStorage.getItem(LS_KEYS.USERS);
     if (!s) {
       localStorage.setItem(LS_KEYS.USERS, JSON.stringify(INITIAL_USERS));
@@ -175,7 +180,11 @@ export const updateUserPassword = async (username: string, newPass: string): Pro
       .update({ password_hash: newPass })
       .eq('username', username);
     
-    return !error;
+    if (error) {
+      console.error("Error updating password in Supabase:", error);
+      return false;
+    }
+    return true;
   } else {
     const users = await getUsers();
     const index = users.findIndex(u => u.username === username);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { getUsers } from '../services/dataService';
+import { saveSupabaseConfig, getStoredSupabaseConfig, isSupabaseConfigured } from '../services/supabaseClient';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -13,6 +14,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Config Modal State
+  const [showConfig, setShowConfig] = useState(false);
+  const [configUrl, setConfigUrl] = useState('');
+  const [configKey, setConfigKey] = useState('');
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -29,6 +35,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
     };
     loadUsers();
+
+    // Load stored config for the modal
+    const stored = getStoredSupabaseConfig();
+    setConfigUrl(stored.url);
+    setConfigKey(stored.key);
   }, []);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -40,6 +51,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     } else {
       setError('Invalid password. Please try again.');
     }
+  };
+
+  const handleSaveConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!configUrl.trim() || !configKey.trim()) {
+      alert("Please enter both Supabase URL and Anon Key.");
+      return;
+    }
+    saveSupabaseConfig(configUrl.trim(), configKey.trim());
   };
 
   return (
@@ -73,7 +93,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   required
                   value={selectedUsername}
                   onChange={(e) => setSelectedUsername(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all appearance-none bg-white"
+                  className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all appearance-none bg-white text-slate-700"
                 >
                   {users.map((u) => (
                     <option key={u.id} value={u.username}>
@@ -125,10 +145,77 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </form>
         )}
         
-        <div className="mt-6 text-center text-xs text-slate-400">
-          Arihant Aaradhya Site Supply Manager
+        <div className="mt-6 flex justify-between items-center">
+          <span className="text-xs text-slate-400">Arihant Aaradhya Site Supply Manager</span>
+          <button 
+            onClick={() => setShowConfig(true)}
+            className="text-slate-400 hover:text-brand-600 transition-colors"
+            title="Database Configuration"
+          >
+            <i className={`fas fa-cog ${isSupabaseConfigured() ? 'text-brand-500' : 'text-slate-300'}`}></i>
+          </button>
         </div>
       </div>
+
+      {/* Database Configuration Modal */}
+      {showConfig && (
+        <div className="fixed inset-0 bg-slate-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 animate-fade-in-up">
+            <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+              <h2 className="text-lg font-bold text-slate-800">Database Connection</h2>
+              <button onClick={() => setShowConfig(false)} className="text-slate-400 hover:text-slate-600">
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            
+            <p className="text-sm text-slate-600 mb-4 bg-blue-50 p-3 rounded-lg border border-blue-100">
+              <i className="fas fa-info-circle text-blue-500 mr-2"></i>
+              Enter your <strong>Supabase Project URL</strong> and <strong>Anon Key</strong> below to sync data to the cloud.
+            </p>
+
+            <form onSubmit={handleSaveConfig} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Project URL</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="https://xyz.supabase.co"
+                  value={configUrl}
+                  onChange={(e) => setConfigUrl(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Anon API Key</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5c..."
+                  value={configKey}
+                  onChange={(e) => setConfigKey(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                />
+              </div>
+
+              <div className="pt-4 flex justify-end space-x-3">
+                 <button
+                  type="button"
+                  onClick={() => setShowConfig(false)}
+                  className="px-4 py-2 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium shadow-md transition-colors text-sm"
+                >
+                  Save & Connect
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

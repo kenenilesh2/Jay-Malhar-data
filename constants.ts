@@ -30,10 +30,10 @@ export const UNITS: Record<string, string> = {
   [MaterialType.METAL2]: 'Brass',
   [MaterialType.METAL4]: 'Brass',
   [MaterialType.GSB]: 'Brass',
-  [MaterialType.CONSTRUCTION_WATER]: 'Tanker (10k L)',
+  [MaterialType.CONSTRUCTION_WATER]: 'Tanker',
   [MaterialType.DRINKING_WATER]: 'Tanker',
   [MaterialType.BORING_WATER]: 'Tanker',
-  [MaterialType.DRINKING_JAR]: 'Jars',
+  [MaterialType.DRINKING_JAR]: 'Jars (20L)',
   [MaterialType.JCB]: 'Hours',
   [MaterialType.DUMPER]: 'Trip'
 };
