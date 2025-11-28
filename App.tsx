@@ -140,6 +140,8 @@ function App() {
             filterValue={filterMaterial}
             onClearFilter={() => setFilterMaterial(undefined)}
             onAddClick={() => setShowEntryForm(true)}
+            enableExport={true}
+            enableDateFilter={true}
             columns={[
               { header: 'Date', accessor: (i) => new Date(i.date).toLocaleDateString() },
               { header: 'Challan', accessor: (i) => <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">{i.challanNumber}</span> },
@@ -156,6 +158,8 @@ function App() {
             title="Supplier Payments"
             data={payments}
             onAddClick={() => setShowPaymentForm(true)}
+            enableExport={true}
+            enableDateFilter={true}
             columns={[
               { header: 'Date', accessor: (i) => new Date(i.date).toLocaleDateString() },
               { header: 'Supplier', accessor: (i) => <span className="font-medium">{i.supplierName}</span> },

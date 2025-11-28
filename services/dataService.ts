@@ -11,8 +11,8 @@ const LS_KEYS = {
 
 // Helper to log errors safely
 const logSupabaseError = (context: string, error: any) => {
-  // Check for "relation does not exist" (Postgres 42P01)
-  if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+  // Check for "relation does not exist" (Postgres 42P01 or PGRST205)
+  if (error?.code === '42P01' || error?.code === 'PGRST205' || error?.message?.includes('does not exist')) {
     console.warn(`[${context}] Table not found in Supabase. Please run the SQL setup script in your Supabase SQL Editor.`);
   } else {
     console.error(`[${context}] Error:`, JSON.stringify(error, null, 2));
@@ -168,7 +168,8 @@ export const getPayments = async (): Promise<SupplierPayment[]> => {
 
 export const getUsers = async (): Promise<User[]> => {
   if (isSupabaseConfigured() && supabase) {
-    const { data, error } = await supabase.from('app_users').select('*').order('name');
+    // Changed table from 'app_users' to 'users' to match database hint
+    const { data, error } = await supabase.from('users').select('*').order('name');
     
     if (error) {
       logSupabaseError('getUsers', error);
@@ -185,7 +186,8 @@ export const getUsers = async (): Promise<User[]> => {
         role: u.role,
         password_hash: u.passwordHash
       }));
-      const { error: seedError } = await supabase.from('app_users').insert(seedData);
+      // Changed table from 'app_users' to 'users'
+      const { error: seedError } = await supabase.from('users').insert(seedData);
       if (seedError) {
         logSupabaseError('seedUsers', seedError);
       } else {
@@ -214,15 +216,24 @@ export const getUsers = async (): Promise<User[]> => {
 
 export const updateUserPassword = async (username: string, newPass: string): Promise<boolean> => {
   if (isSupabaseConfigured() && supabase) {
-    const { error } = await supabase
-      .from('app_users')
+    // Changed table from 'app_users' to 'users'
+    const { data, error } = await supabase
+      .from('users')
       .update({ password_hash: newPass })
-      .eq('username', username);
+      .eq('username', username)
+      .select(); // Select to confirm update happened
     
     if (error) {
       logSupabaseError('updateUserPassword', error);
       return false;
     }
+
+    // Check if any row was actually updated
+    if (!data || data.length === 0) {
+      console.warn("No user found with username:", username);
+      return false;
+    }
+
     return true;
   } else {
     const users = await getUsers();

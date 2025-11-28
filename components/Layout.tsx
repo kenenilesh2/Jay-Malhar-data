@@ -40,10 +40,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col w-64 bg-slate-900 text-white shadow-xl z-20">
         <div className="p-6 border-b border-slate-700">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-brand-400 to-blue-300 bg-clip-text text-transparent">
-            Jay Malhar Ent.
+          <h1 className="text-lg font-bold bg-gradient-to-r from-brand-400 to-blue-300 bg-clip-text text-transparent leading-tight">
+            Jay Malhar Enterprises
           </h1>
-          <p className="text-xs text-slate-400 mt-1">Supply Chain Management</p>
+          <p className="text-xs text-slate-400 mt-2">Arihant Aaradhya Site</p>
         </div>
         
         <nav className="flex-1 px-3 py-6 overflow-y-auto">
@@ -75,7 +75,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
 
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 w-full bg-slate-900 text-white z-30 h-16 flex items-center justify-between px-4 shadow-md">
-        <h1 className="font-bold text-lg">Jay Malhar Ent.</h1>
+        <div>
+          <h1 className="font-bold text-md">Jay Malhar Enterprises</h1>
+          <p className="text-[10px] text-slate-400">Arihant Aaradhya Site</p>
+        </div>
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="text-white p-2 focus:outline-none"

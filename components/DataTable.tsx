@@ -12,6 +12,8 @@ interface DataTableProps<T> {
   onAddClick: () => void;
   filterValue?: string;
   onClearFilter?: () => void;
+  enableExport?: boolean;
+  enableDateFilter?: boolean;
 }
 
 const DataTable = <T extends { id: string }>({ 
@@ -20,27 +22,72 @@ const DataTable = <T extends { id: string }>({
   columns, 
   onAddClick,
   filterValue,
-  onClearFilter
+  onClearFilter,
+  enableExport,
+  enableDateFilter
 }: DataTableProps<T>) => {
   const [search, setSearch] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState('');
 
-  // Simple client-side search across all stringified values
+  // Search and Filter Logic
   const filteredData = data.filter(item => {
-    // If external filter provided (e.g. from Dashboard click)
+    // 1. Month Filter
+    if (selectedMonth) {
+       // Assume item has a 'date' property string
+       const dateVal = (item as any).date;
+       if (typeof dateVal === 'string' && !dateVal.startsWith(selectedMonth)) {
+         return false;
+       }
+    }
+
+    // 2. External Filter (from Dashboard)
     if (filterValue) {
-       // Assuming 'material' is the key we filter on for entries. 
-       // This is a bit specific, but works for the use case.
        const mat = (item as any).material; 
        if (mat && mat !== filterValue) return false;
     }
 
+    // 3. Search
     const rowString = Object.values(item).join(' ').toLowerCase();
     return rowString.includes(search.toLowerCase());
   });
 
+  const handleExport = () => {
+    if (filteredData.length === 0) {
+      alert("No data to export");
+      return;
+    }
+
+    // Extract headers from keys of the first item
+    const firstItem = filteredData[0];
+    const keys = Object.keys(firstItem).filter(k => k !== 'id' && k !== 'timestamp');
+
+    // Build CSV content
+    const headerRow = keys.join(',');
+    const rows = filteredData.map(item => {
+      return keys.map(key => {
+        const val = (item as any)[key];
+        // Escape quotes and wrap in quotes
+        const escaped = String(val ?? '').replace(/"/g, '""');
+        return `"${escaped}"`;
+      }).join(',');
+    });
+
+    const csvContent = [headerRow, ...rows].join('\n');
+    
+    // Trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${title.replace(/\s+/g, '_')}_${selectedMonth || 'All'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center">
             {title}
@@ -53,7 +100,19 @@ const DataTable = <T extends { id: string }>({
           </h2>
         </div>
         
-        <div className="flex gap-3 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          {/* Month Filter */}
+          {enableDateFilter && (
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+              title="Filter by Month"
+            />
+          )}
+
+          {/* Search */}
           <div className="relative flex-1 sm:flex-none">
             <i className="fas fa-search absolute left-3 top-3 text-slate-400 text-sm"></i>
             <input
@@ -61,12 +120,25 @@ const DataTable = <T extends { id: string }>({
               placeholder="Search..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full sm:w-64 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+              className="w-full sm:w-48 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm"
             />
           </div>
+          
+          {/* Export Button */}
+          {enableExport && (
+             <button 
+              onClick={handleExport}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors flex items-center justify-center whitespace-nowrap"
+              title="Download Excel/CSV"
+            >
+              <i className="fas fa-file-csv mr-2"></i> Export
+            </button>
+          )}
+
+          {/* Add Button */}
           <button 
             onClick={onAddClick}
-            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors flex items-center"
+            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors flex items-center justify-center whitespace-nowrap"
           >
             <i className="fas fa-plus mr-2"></i> Add New
           </button>

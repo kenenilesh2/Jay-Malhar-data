@@ -57,7 +57,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, onSubmit, onCancel }
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Date *</label>
             <input
               type="date"
               name="date"
@@ -68,7 +68,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, onSubmit, onCancel }
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Challan Number</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Challan Number *</label>
             <input
               type="text"
               name="challanNumber"
@@ -82,9 +82,10 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, onSubmit, onCancel }
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Material</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Material *</label>
           <select
             name="material"
+            required
             value={formData.material}
             onChange={handleChange}
             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
@@ -98,7 +99,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, onSubmit, onCancel }
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              Quantity ({UNITS[formData.material]})
+              Quantity ({UNITS[formData.material]}) *
             </label>
             <input
               type="number"
@@ -112,10 +113,11 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, onSubmit, onCancel }
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Number</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Number *</label>
             <input
               type="text"
               name="vehicleNumber"
+              required
               placeholder="MH-XX-XXXX"
               value={formData.vehicleNumber}
               onChange={handleChange}

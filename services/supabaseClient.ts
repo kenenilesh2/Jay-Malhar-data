@@ -85,8 +85,8 @@ create table if not exists payments (
   created_at timestamptz default now()
 );
 
--- 3. Users Table
-create table if not exists app_users (
+-- 3. Users Table (Note: Renamed to 'users' based on existing DB hints)
+create table if not exists users (
   id uuid default gen_random_uuid() primary key,
   username text unique not null,
   name text not null,
@@ -98,9 +98,9 @@ create table if not exists app_users (
 -- RLS Policies (Enable public access for this app)
 alter table entries enable row level security;
 alter table payments enable row level security;
-alter table app_users enable row level security;
+alter table users enable row level security;
 
 create policy "Public access entries" on entries for all using (true) with check (true);
 create policy "Public access payments" on payments for all using (true) with check (true);
-create policy "Public access users" on app_users for all using (true) with check (true);
+create policy "Public access users" on users for all using (true) with check (true);
 */
