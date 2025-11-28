@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MaterialType, MaterialEntry } from '../types';
 import { MATERIALS_LIST, UNITS, SITE_NAME } from '../constants';
 
 interface EntryFormProps {
   currentUser: string;
-  onSubmit: (entry: Omit<MaterialEntry, 'id' | 'timestamp'>) => Promise<void>;
+  initialData?: MaterialEntry;
+  onSubmit: (entry: any) => Promise<void>;
   onCancel: () => void;
 }
 
-const EntryForm: React.FC<EntryFormProps> = ({ currentUser, onSubmit, onCancel }) => {
+const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmit, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -17,6 +18,18 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, onSubmit, onCancel }
     quantity: '',
     vehicleNumber: '',
   });
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        date: initialData.date,
+        challanNumber: initialData.challanNumber,
+        material: initialData.material,
+        quantity: String(initialData.quantity),
+        vehicleNumber: initialData.vehicleNumber || '',
+      });
+    }
+  }, [initialData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -28,6 +41,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, onSubmit, onCancel }
     setLoading(true);
     try {
       await onSubmit({
+        id: initialData?.id, // Pass ID if editing
         date: formData.date,
         challanNumber: formData.challanNumber,
         material: formData.material,
@@ -35,7 +49,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, onSubmit, onCancel }
         unit: UNITS[formData.material],
         vehicleNumber: formData.vehicleNumber,
         siteName: SITE_NAME,
-        createdBy: currentUser
+        createdBy: initialData ? initialData.createdBy : currentUser // Preserve original creator on edit
       });
     } catch (err) {
       console.error(err);
@@ -48,7 +62,9 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, onSubmit, onCancel }
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 max-w-2xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-bold text-slate-800">New Material Entry</h3>
+        <h3 className="text-xl font-bold text-slate-800">
+          {initialData ? 'Edit Material Entry' : 'New Material Entry'}
+        </h3>
         <button onClick={onCancel} className="text-slate-400 hover:text-slate-600">
           <i className="fas fa-times"></i>
         </button>
@@ -140,7 +156,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, onSubmit, onCancel }
             className="px-6 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium shadow-md transition-colors disabled:opacity-50 flex items-center"
           >
             {loading ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
-            Save Entry
+            {initialData ? 'Update Entry' : 'Save Entry'}
           </button>
         </div>
       </form>

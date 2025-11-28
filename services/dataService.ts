@@ -66,9 +66,52 @@ export const addEntry = async (entry: Omit<MaterialEntry, 'id' | 'timestamp'>): 
       id: Math.random().toString(36).substr(2, 9),
       timestamp: Date.now()
     };
-    const current = await getEntries(); // await in case we switch implementation later
+    const current = await getEntries(); 
     localStorage.setItem(LS_KEYS.ENTRIES, JSON.stringify([...current, newEntry]));
     return newEntry;
+  }
+};
+
+export const updateEntry = async (id: string, entry: Partial<MaterialEntry>): Promise<void> => {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase
+      .from('entries')
+      .update({
+        date: entry.date,
+        challan_number: entry.challanNumber,
+        material: entry.material,
+        quantity: entry.quantity,
+        unit: entry.unit,
+        vehicle_number: entry.vehicleNumber,
+        site_name: entry.siteName,
+      })
+      .eq('id', id);
+
+    if (error) {
+      logSupabaseError('updateEntry', error);
+      throw error;
+    }
+  } else {
+    const current = await getEntries();
+    const index = current.findIndex(e => e.id === id);
+    if (index !== -1) {
+      current[index] = { ...current[index], ...entry };
+      localStorage.setItem(LS_KEYS.ENTRIES, JSON.stringify(current));
+    }
+  }
+};
+
+export const deleteEntry = async (id: string): Promise<void> => {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('entries').delete().eq('id', id);
+    if (error) {
+      logSupabaseError('deleteEntry', error);
+      throw error;
+    }
+  } else {
+    const current = await getEntries();
+    const filtered = current.filter(e => e.id !== id);
+    localStorage.setItem(LS_KEYS.ENTRIES, JSON.stringify(filtered));
   }
 };
 
@@ -78,7 +121,6 @@ export const getEntries = async (): Promise<MaterialEntry[]> => {
     
     if (error) {
       logSupabaseError('getEntries', error);
-      // Return empty array instead of throwing to prevent app crash if table missing
       return []; 
     }
     
@@ -139,6 +181,47 @@ export const addPayment = async (payment: Omit<SupplierPayment, 'id' | 'timestam
   }
 };
 
+export const updatePayment = async (id: string, payment: Partial<SupplierPayment>): Promise<void> => {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase
+      .from('payments')
+      .update({
+        date: payment.date,
+        supplier_name: payment.supplierName,
+        amount: payment.amount,
+        payment_mode: payment.paymentMode,
+        notes: payment.notes,
+      })
+      .eq('id', id);
+
+    if (error) {
+      logSupabaseError('updatePayment', error);
+      throw error;
+    }
+  } else {
+    const current = await getPayments();
+    const index = current.findIndex(p => p.id === id);
+    if (index !== -1) {
+      current[index] = { ...current[index], ...payment };
+      localStorage.setItem(LS_KEYS.PAYMENTS, JSON.stringify(current));
+    }
+  }
+};
+
+export const deletePayment = async (id: string): Promise<void> => {
+  if (isSupabaseConfigured() && supabase) {
+    const { error } = await supabase.from('payments').delete().eq('id', id);
+    if (error) {
+      logSupabaseError('deletePayment', error);
+      throw error;
+    }
+  } else {
+    const current = await getPayments();
+    const filtered = current.filter(p => p.id !== id);
+    localStorage.setItem(LS_KEYS.PAYMENTS, JSON.stringify(filtered));
+  }
+};
+
 export const getPayments = async (): Promise<SupplierPayment[]> => {
   if (isSupabaseConfigured() && supabase) {
     const { data, error } = await supabase.from('payments').select('*').order('date', { ascending: false });
@@ -168,16 +251,13 @@ export const getPayments = async (): Promise<SupplierPayment[]> => {
 
 export const getUsers = async (): Promise<User[]> => {
   if (isSupabaseConfigured() && supabase) {
-    // Changed table from 'app_users' to 'users' to match database hint
     const { data, error } = await supabase.from('users').select('*').order('name');
     
     if (error) {
       logSupabaseError('getUsers', error);
-      // Fallback to memory constants in case of query error (e.g., table missing)
       return INITIAL_USERS;
     }
     
-    // Seed users if table is empty
     if (!data || data.length === 0) {
       console.log("Seeding initial users...");
       const seedData = INITIAL_USERS.map(u => ({
@@ -186,12 +266,10 @@ export const getUsers = async (): Promise<User[]> => {
         role: u.role,
         password_hash: u.passwordHash
       }));
-      // Changed table from 'app_users' to 'users'
       const { error: seedError } = await supabase.from('users').insert(seedData);
       if (seedError) {
         logSupabaseError('seedUsers', seedError);
       } else {
-        // Return seeded users immediately
         return INITIAL_USERS;
       }
     }
@@ -204,7 +282,6 @@ export const getUsers = async (): Promise<User[]> => {
       passwordHash: d.password_hash
     }));
   } else {
-    // Local Storage logic
     const s = localStorage.getItem(LS_KEYS.USERS);
     if (!s) {
       localStorage.setItem(LS_KEYS.USERS, JSON.stringify(INITIAL_USERS));
@@ -216,19 +293,17 @@ export const getUsers = async (): Promise<User[]> => {
 
 export const updateUserPassword = async (username: string, newPass: string): Promise<boolean> => {
   if (isSupabaseConfigured() && supabase) {
-    // Changed table from 'app_users' to 'users'
     const { data, error } = await supabase
       .from('users')
       .update({ password_hash: newPass })
       .eq('username', username)
-      .select(); // Select to confirm update happened
+      .select();
     
     if (error) {
       logSupabaseError('updateUserPassword', error);
       return false;
     }
 
-    // Check if any row was actually updated
     if (!data || data.length === 0) {
       console.warn("No user found with username:", username);
       return false;

@@ -14,6 +14,8 @@ interface DataTableProps<T> {
   onClearFilter?: () => void;
   enableExport?: boolean;
   enableDateFilter?: boolean;
+  onEdit?: (item: T) => void;
+  onDelete?: (item: T) => void;
 }
 
 const DataTable = <T extends { id: string }>({ 
@@ -24,7 +26,9 @@ const DataTable = <T extends { id: string }>({
   filterValue,
   onClearFilter,
   enableExport,
-  enableDateFilter
+  enableDateFilter,
+  onEdit,
+  onDelete
 }: DataTableProps<T>) => {
   const [search, setSearch] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
@@ -152,6 +156,7 @@ const DataTable = <T extends { id: string }>({
               {columns.map((col, idx) => (
                 <th key={idx} className="px-6 py-4">{col.header}</th>
               ))}
+              {(onEdit || onDelete) && <th className="px-6 py-4 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -163,11 +168,35 @@ const DataTable = <T extends { id: string }>({
                       {col.accessor(item)}
                     </td>
                   ))}
+                  {(onEdit || onDelete) && (
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end space-x-2">
+                        {onEdit && (
+                          <button 
+                            onClick={() => onEdit(item)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Edit"
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
+                        )}
+                        {onDelete && (
+                          <button 
+                            onClick={() => onDelete(item)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <i className="fas fa-trash-alt"></i>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={columns.length} className="px-6 py-12 text-center text-slate-400">
+                <td colSpan={columns.length + (onEdit || onDelete ? 1 : 0)} className="px-6 py-12 text-center text-slate-400">
                   <div className="flex flex-col items-center">
                     <i className="far fa-folder-open text-3xl mb-3 opacity-50"></i>
                     <p>No records found.</p>

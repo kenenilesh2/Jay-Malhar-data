@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SupplierPayment } from '../types';
 
 interface PaymentFormProps {
   currentUser: string;
-  onSubmit: (payment: Omit<SupplierPayment, 'id' | 'timestamp'>) => Promise<void>;
+  initialData?: SupplierPayment;
+  onSubmit: (payment: any) => Promise<void>;
   onCancel: () => void;
 }
 
-const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, onSubmit, onCancel }) => {
+const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, initialData, onSubmit, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -16,6 +17,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, onSubmit, onCanc
     paymentMode: 'Bank Transfer',
     notes: '',
   });
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        date: initialData.date,
+        supplierName: initialData.supplierName,
+        amount: String(initialData.amount),
+        paymentMode: initialData.paymentMode,
+        notes: initialData.notes || '',
+      });
+    }
+  }, [initialData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -27,12 +40,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, onSubmit, onCanc
     setLoading(true);
     try {
       await onSubmit({
+        id: initialData?.id,
         date: formData.date,
         supplierName: formData.supplierName,
         amount: parseFloat(formData.amount),
         paymentMode: formData.paymentMode,
         notes: formData.notes,
-        createdBy: currentUser
+        createdBy: initialData ? initialData.createdBy : currentUser
       });
     } catch (err) {
       console.error(err);
@@ -45,7 +59,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, onSubmit, onCanc
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 max-w-2xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-bold text-slate-800">Record Payment</h3>
+        <h3 className="text-xl font-bold text-slate-800">
+          {initialData ? 'Edit Payment' : 'Record Payment'}
+        </h3>
         <button onClick={onCancel} className="text-slate-400 hover:text-slate-600">
           <i className="fas fa-times"></i>
         </button>
@@ -134,7 +150,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, onSubmit, onCanc
             className="px-6 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium shadow-md transition-colors disabled:opacity-50 flex items-center"
           >
             {loading ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
-            Save Payment
+            {initialData ? 'Update Payment' : 'Save Payment'}
           </button>
         </div>
       </form>

@@ -6,7 +6,12 @@ import EntryForm from './components/EntryForm';
 import PaymentForm from './components/PaymentForm';
 import DataTable from './components/DataTable';
 import { User, MaterialEntry, SupplierPayment, PageView, MaterialType, UserRole } from './types';
-import { getEntries, getPayments, addEntry, addPayment, getUsers, updateUserPassword } from './services/dataService';
+import { 
+  getEntries, getPayments, getUsers, 
+  addEntry, updateEntry, deleteEntry,
+  addPayment, updatePayment, deletePayment,
+  updateUserPassword 
+} from './services/dataService';
 import { isSupabaseConfigured } from './services/supabaseClient';
 
 function App() {
@@ -21,9 +26,15 @@ function App() {
   const [payments, setPayments] = useState<SupplierPayment[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   
-  // UI State
+  // UI State - Forms
   const [showEntryForm, setShowEntryForm] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  
+  // UI State - Editing
+  const [editingEntry, setEditingEntry] = useState<MaterialEntry | undefined>(undefined);
+  const [editingPayment, setEditingPayment] = useState<SupplierPayment | undefined>(undefined);
+
+  // UI State - Filtering
   const [filterMaterial, setFilterMaterial] = useState<string | undefined>(undefined);
   
   // Admin UI State
@@ -60,17 +71,67 @@ function App() {
     setPayments([]);
   };
 
-  const handleAddEntry = async (entry: Omit<MaterialEntry, 'id' | 'timestamp'>) => {
-    await addEntry(entry);
+  // --- Entries Logic ---
+
+  const handleSaveEntry = async (entryData: any) => {
+    if (entryData.id) {
+      // Update
+      await updateEntry(entryData.id, entryData);
+    } else {
+      // Create
+      await addEntry(entryData);
+    }
     await loadData();
     setShowEntryForm(false);
+    setEditingEntry(undefined);
   };
 
-  const handleAddPayment = async (payment: Omit<SupplierPayment, 'id' | 'timestamp'>) => {
-    await addPayment(payment);
+  const handleEditEntry = (entry: MaterialEntry) => {
+    setEditingEntry(entry);
+    setShowEntryForm(true);
+  };
+
+  const handleDeleteEntry = async (entry: MaterialEntry) => {
+    if (window.confirm(`Are you sure you want to delete entry for ${entry.material}?`)) {
+      try {
+        await deleteEntry(entry.id);
+        await loadData();
+      } catch (e) {
+        alert("Failed to delete entry");
+      }
+    }
+  };
+
+  // --- Payments Logic ---
+
+  const handleSavePayment = async (paymentData: any) => {
+    if (paymentData.id) {
+      await updatePayment(paymentData.id, paymentData);
+    } else {
+      await addPayment(paymentData);
+    }
     await loadData();
     setShowPaymentForm(false);
+    setEditingPayment(undefined);
   };
+
+  const handleEditPayment = (payment: SupplierPayment) => {
+    setEditingPayment(payment);
+    setShowPaymentForm(true);
+  };
+
+  const handleDeletePayment = async (payment: SupplierPayment) => {
+    if (window.confirm(`Are you sure you want to delete payment of ₹${payment.amount}?`)) {
+       try {
+        await deletePayment(payment.id);
+        await loadData();
+      } catch (e) {
+        alert("Failed to delete payment");
+      }
+    }
+  };
+
+  // --- Dashboard Logic ---
 
   const handleDashboardFilter = (material?: MaterialType) => {
     setFilterMaterial(material);
@@ -84,7 +145,6 @@ function App() {
       if (success) {
         alert('Password updated successfully');
         setNewPassword('');
-        // Reload users to get updated hashes if needed locally, though simple auth checks local object in Login
         const updatedUsers = await getUsers();
         setUsers(updatedUsers);
       } else {
@@ -101,13 +161,19 @@ function App() {
     return <Login onLogin={handleLogin} />;
   }
 
+  const isAdmin = currentUser.role === UserRole.ADMIN;
+
   const renderContent = () => {
     if (showEntryForm) {
       return (
         <EntryForm 
           currentUser={currentUser.name}
-          onSubmit={handleAddEntry} 
-          onCancel={() => setShowEntryForm(false)} 
+          initialData={editingEntry}
+          onSubmit={handleSaveEntry} 
+          onCancel={() => {
+            setShowEntryForm(false);
+            setEditingEntry(undefined);
+          }} 
         />
       );
     }
@@ -116,8 +182,12 @@ function App() {
       return (
         <PaymentForm 
           currentUser={currentUser.name}
-          onSubmit={handleAddPayment} 
-          onCancel={() => setShowPaymentForm(false)} 
+          initialData={editingPayment}
+          onSubmit={handleSavePayment} 
+          onCancel={() => {
+            setShowPaymentForm(false);
+            setEditingPayment(undefined);
+          }} 
         />
       );
     }
@@ -139,9 +209,15 @@ function App() {
             data={entries}
             filterValue={filterMaterial}
             onClearFilter={() => setFilterMaterial(undefined)}
-            onAddClick={() => setShowEntryForm(true)}
+            onAddClick={() => {
+              setEditingEntry(undefined);
+              setShowEntryForm(true);
+            }}
             enableExport={true}
             enableDateFilter={true}
+            // Pass edit/delete handlers ONLY if admin
+            onEdit={isAdmin ? handleEditEntry : undefined}
+            onDelete={isAdmin ? handleDeleteEntry : undefined}
             columns={[
               { header: 'Date', accessor: (i) => new Date(i.date).toLocaleDateString() },
               { header: 'Challan', accessor: (i) => <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">{i.challanNumber}</span> },
@@ -157,9 +233,15 @@ function App() {
           <DataTable<SupplierPayment>
             title="Supplier Payments"
             data={payments}
-            onAddClick={() => setShowPaymentForm(true)}
+            onAddClick={() => {
+              setEditingPayment(undefined);
+              setShowPaymentForm(true);
+            }}
             enableExport={true}
             enableDateFilter={true}
+            // Pass edit/delete handlers ONLY if admin
+            onEdit={isAdmin ? handleEditPayment : undefined}
+            onDelete={isAdmin ? handleDeletePayment : undefined}
             columns={[
               { header: 'Date', accessor: (i) => new Date(i.date).toLocaleDateString() },
               { header: 'Supplier', accessor: (i) => <span className="font-medium">{i.supplierName}</span> },
@@ -171,7 +253,7 @@ function App() {
           />
         );
       case 'admin':
-        if (currentUser.role !== UserRole.ADMIN) return <div>Access Denied</div>;
+        if (!isAdmin) return <div>Access Denied</div>;
         return (
           <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 max-w-2xl mx-auto">
             <h2 className="text-xl font-bold mb-6 text-slate-800">Admin Settings</h2>
@@ -235,6 +317,8 @@ function App() {
         setPage(p);
         setShowEntryForm(false);
         setShowPaymentForm(false);
+        setEditingEntry(undefined);
+        setEditingPayment(undefined);
       }}
       onLogout={handleLogout}
     >
