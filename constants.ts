@@ -6,6 +6,7 @@ export const INITIAL_USERS: User[] = [
   { id: '3', username: 'Dhiraj Kene', name: 'Dhiraj Kene', role: UserRole.USER, passwordHash: 'admin@123' },
   { id: '4', username: 'Ajay Kene', name: 'Ajay Kene', role: UserRole.USER, passwordHash: 'admin@123' },
   { id: '5', username: 'Bhavesh Kene', name: 'Bhavesh Kene', role: UserRole.USER, passwordHash: 'admin@123' },
+  { id: '6', username: 'Umesh Kene', name: 'Umesh Kene', role: UserRole.USER, passwordHash: 'Umesh@123' }
 ];
 
 export const SUPPLIERS_LIST = [
