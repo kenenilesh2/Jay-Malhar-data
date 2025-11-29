@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { SupplierPayment } from '../types';
 import { SUPPLIERS_LIST } from '../constants';
@@ -23,9 +24,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, initialData, onS
 
   useEffect(() => {
     if (initialData) {
-      // Check if initial supplier is in the predefined list
       const isPredefined = SUPPLIERS_LIST.includes(initialData.supplierName);
-      
       setFormData({
         date: initialData.date,
         supplierName: initialData.supplierName,
@@ -146,6 +145,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ currentUser, initialData, onS
               type="number"
               name="amount"
               step="1"
+              min="0"
               required
               placeholder="0"
               value={formData.amount}

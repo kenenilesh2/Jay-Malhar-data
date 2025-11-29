@@ -1,5 +1,7 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { MaterialEntry, SupplierPayment } from "../types";
+import { CLIENT_LEDGER_DATA } from "./clientLedgerData";
 
 export const analyzeBusinessData = async (
   entries: MaterialEntry[], 
@@ -14,35 +16,34 @@ export const analyzeBusinessData = async (
 
   const ai = new GoogleGenAI({ apiKey });
 
-  // Summarize data to send to LLM (prevent token overflow if data is huge)
-  // We send a JSON representation of the last 50 entries and last 20 payments for context
-  const entriesContext = entries.slice(0, 100).map(e => ({
-    date: e.date,
-    material: e.material,
-    qty: e.quantity,
-    unit: e.unit,
-    challan: e.challanNumber
+  const entriesContext = entries.slice(0, 50).map(e => ({
+    d: e.date,
+    m: e.material,
+    q: e.quantity,
+    u: e.unit
   }));
 
-  const paymentsContext = payments.slice(0, 50).map(p => ({
-    date: p.date,
-    supplier: p.supplierName,
-    amount: p.amount,
-    notes: p.notes
-  }));
+  // Summarize Ledger Data
+  const totalBilled = CLIENT_LEDGER_DATA.reduce((acc, curr) => acc + curr.credit, 0);
+  const totalReceived = CLIENT_LEDGER_DATA.reduce((acc, curr) => acc + curr.debit, 0);
+  
+  const ledgerContext = {
+    summary: `Historical Data (Arihant Ledger): Total Billed: ${totalBilled}, Total Received: ${totalReceived}`,
+    recentTransactions: CLIENT_LEDGER_DATA.slice(-15)
+  };
 
   const prompt = `
-    You are an AI assistant for "Jay Malhar Enterprises", a construction supply firm.
-    We supply materials (Sand, Metal, Water) and Machinery (JCB, Dumper) to the site "Arihant Aaradhya".
+    You are an AI assistant for "Jay Malhar Enterprises".
     
-    Here is a subset of the recent data:
-    Entries: ${JSON.stringify(entriesContext)}
-    Payments: ${JSON.stringify(paymentsContext)}
+    Data Context:
+    1. Daily Site Entries (System): ${JSON.stringify(entriesContext)}
+    2. Client Ledger (Arihant Superstructures): ${JSON.stringify(ledgerContext)}
     
     User Question: "${question}"
     
-    Please provide a concise, professional business insight or answer based on the data provided. 
-    If you calculate totals, show your work briefly. If the data provided doesn't cover the answer, state that clearly.
+    Answer concisely. 
+    - Use "Client Ledger" data if asked about "Arihant", "Client Billing", "History" or "Ledger".
+    - Use "Daily Site Entries" if asked about specific material loads recently.
   `;
 
   try {

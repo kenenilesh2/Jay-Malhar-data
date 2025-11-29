@@ -1,9 +1,9 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { MaterialEntry, InvoiceItem, InvoiceCategory } from '../types';
+import { MaterialEntry, InvoiceItem, InvoiceCategory, ClientLedgerEntry } from '../types';
 import { GST_RATES, SITE_NAME, UNITS } from '../constants';
 
-// PDF Safe Currency Formatter (Avoids unicode symbols like ₹ which might break in standard fonts)
+// PDF Safe Currency Formatter
 const formatCurrencyPDF = (amount: number) => {
   return `Rs. ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
@@ -29,38 +29,27 @@ const addHeader = (doc: jsPDF, title: string) => {
 
 export const generateChallanPDF = (entry: MaterialEntry) => {
   const doc = new jsPDF();
-  
   addHeader(doc, "DELIVERY CHALLAN");
   
-  // Details
   doc.setFontSize(11);
   const startY = 70;
-  
   doc.text(`Challan No: ${entry.challanNumber}`, 15, startY);
   doc.text(`Date: ${new Date(entry.date).toLocaleDateString()}`, 140, startY);
-  
   doc.text(`Site Name: ${entry.siteName}`, 15, startY + 10);
   doc.text(`Vehicle No: ${entry.vehicleNumber || 'N/A'}`, 140, startY + 10);
   
-  // Table
   autoTable(doc, {
     startY: startY + 25,
     head: [['Sr. No.', 'Description of Material', 'Quantity', 'Unit']],
-    body: [
-      ['1', entry.material, entry.quantity.toString(), entry.unit]
-    ],
+    body: [['1', entry.material, entry.quantity.toString(), entry.unit]],
     theme: 'grid',
     headStyles: { fillColor: [14, 165, 233] },
-    columnStyles: {
-      2: { halign: 'right' }
-    }
+    columnStyles: { 2: { halign: 'right' } }
   });
   
-  // Footer
   const finalY = (doc as any).lastAutoTable.finalY + 40;
   doc.text("Receiver's Signature", 15, finalY);
   doc.text("For Jay Malhar Enterprises", 140, finalY);
-  
   doc.save(`Challan_${entry.challanNumber}.pdf`);
 };
 
@@ -73,7 +62,6 @@ export const generateMonthlyInvoicePDF = (
   grandTotal: number
 ) => {
   const doc = new jsPDF();
-  
   addHeader(doc, "TAX INVOICE");
   
   doc.setFontSize(10);
@@ -81,36 +69,23 @@ export const generateMonthlyInvoicePDF = (
   doc.text(`Category: ${category}`, 15, 70);
   doc.text(`Site: ${SITE_NAME}`, 140, 65);
   
-  const tableHead = [['Date', 'Challan', 'Vehicle', 'Description', 'Qty', 'Rate', 'Amount']];
   const tableBody = items.map(item => [
-    item.date,
-    item.challanNumber,
-    item.vehicleNumber,
-    item.description,
-    item.quantity.toString(), // Allows for 6.56, 6.2 etc.
-    formatCurrencyPDF(item.rate),
-    formatCurrencyPDF(item.amount)
+    item.date, item.challanNumber, item.vehicleNumber, item.description,
+    item.quantity.toString(), formatCurrencyPDF(item.rate), formatCurrencyPDF(item.amount)
   ]);
   
   autoTable(doc, {
     startY: 75,
-    head: tableHead,
+    head: [['Date', 'Challan', 'Vehicle', 'Description', 'Qty', 'Rate', 'Amount']],
     body: tableBody,
     theme: 'striped',
     headStyles: { fillColor: [44, 62, 80] },
     styles: { fontSize: 9, cellPadding: 2 },
     columnStyles: {
-      0: { cellWidth: 22 }, // Date
-      1: { cellWidth: 28 }, // Challan
-      2: { cellWidth: 25 }, // Vehicle
-      3: { cellWidth: 'auto' }, // Description
-      4: { cellWidth: 15, halign: 'right' }, // Qty
-      5: { cellWidth: 25, halign: 'right' }, // Rate
-      6: { cellWidth: 35, halign: 'right' }, // Amount
+      4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' },
     },
   });
   
-  // Summary
   const taxes = GST_RATES[category];
   const finalY = (doc as any).lastAutoTable.finalY + 10;
   const labelX = 130;
@@ -123,10 +98,8 @@ export const generateMonthlyInvoicePDF = (
   if (category !== 'Water Supply') {
     doc.text(`CGST (${taxes.cgst}%):`, labelX, finalY + 6);
     doc.text(formatCurrencyPDF(totalBase * (taxes.cgst / 100)), valueX, finalY + 6, { align: 'right' });
-    
     doc.text(`SGST (${taxes.sgst}%):`, labelX, finalY + 12);
     doc.text(formatCurrencyPDF(totalBase * (taxes.sgst / 100)), valueX, finalY + 12, { align: 'right' });
-    
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text(`Grand Total:`, labelX, finalY + 22);
@@ -140,7 +113,62 @@ export const generateMonthlyInvoicePDF = (
   
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text("Terms & Conditions: E.&O.E. 1. Goods once sold will not be taken back. 2. Interest @ 24% p.a. will be charged if bill is not paid within due date.", 15, 280);
-  
+  doc.text("Terms & Conditions: E.&O.E. 1. Goods once sold will not be taken back.", 15, 280);
   doc.save(`Invoice_${category}_${month}.pdf`);
+};
+
+export const generateLedgerPDF = (entries: ClientLedgerEntry[], periodLabel: string) => {
+  const doc = new jsPDF();
+  
+  addHeader(doc, "CLIENT LEDGER STATEMENT");
+  
+  doc.setFontSize(10);
+  doc.text(`Client: Arihant Superstructures Ltd`, 15, 65);
+  doc.text(`Site: ${SITE_NAME}`, 15, 70);
+  doc.text(`Period: ${periodLabel}`, 140, 65);
+  
+  const tableHead = [['Date', 'Particulars', 'Vch Type', 'Vch No.', 'Debit (Received)', 'Credit (Billed)']];
+  const tableBody = entries.map(item => [
+    item.date,
+    item.particulars,
+    item.vchType,
+    item.vchNo,
+    item.debit > 0 ? formatCurrencyPDF(item.debit) : '-',
+    item.credit > 0 ? formatCurrencyPDF(item.credit) : '-'
+  ]);
+  
+  autoTable(doc, {
+    startY: 75,
+    head: tableHead,
+    body: tableBody,
+    theme: 'striped',
+    headStyles: { fillColor: [44, 62, 80] },
+    styles: { fontSize: 8, cellPadding: 2 },
+    columnStyles: {
+      0: { cellWidth: 20 },
+      1: { cellWidth: 'auto' },
+      4: { cellWidth: 30, halign: 'right', textColor: [22, 163, 74] },
+      5: { cellWidth: 30, halign: 'right', textColor: [220, 38, 38] },
+    },
+  });
+  
+  const totalDebit = entries.reduce((sum, item) => sum + item.debit, 0);
+  const totalCredit = entries.reduce((sum, item) => sum + item.credit, 0);
+  const balance = totalCredit - totalDebit;
+  
+  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  const labelX = 120;
+  const valueX = 195;
+  
+  doc.setFontSize(10);
+  doc.text(`Total Billed (Credit):`, labelX, finalY);
+  doc.text(formatCurrencyPDF(totalCredit), valueX, finalY, { align: 'right' });
+  doc.text(`Total Received (Debit):`, labelX, finalY + 6);
+  doc.text(formatCurrencyPDF(totalDebit), valueX, finalY + 6, { align: 'right' });
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Closing Balance:`, labelX, finalY + 16);
+  doc.text(formatCurrencyPDF(balance), valueX, finalY + 16, { align: 'right' });
+  
+  doc.save(`Ledger_Arihant_${periodLabel.replace(/\s/g, '_')}.pdf`);
 };

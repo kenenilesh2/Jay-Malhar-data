@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { MaterialType, MaterialEntry } from '../types';
 import { MATERIALS_LIST, UNITS, SITE_NAME, PREDEFINED_VEHICLES } from '../constants';
@@ -25,9 +26,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
 
   useEffect(() => {
     if (initialData) {
-      // Check if the initial vehicle is in our predefined list
       const isPredefined = PREDEFINED_VEHICLES.some(v => v.number === initialData.vehicleNumber);
-      
       setFormData({
         date: initialData.date,
         challanNumber: initialData.challanNumber,
@@ -37,7 +36,6 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
       });
       setIsCustomVehicle(!isPredefined && !!initialData.vehicleNumber);
     } else {
-      // Auto-generate challan number for new entries
       generateChallanNumber().then(num => {
         setFormData(prev => ({ ...prev, challanNumber: num }));
       });
@@ -48,7 +46,6 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
     return PREDEFINED_VEHICLES.filter(v => v.materials.includes(formData.material as MaterialType));
   }, [formData.material]);
 
-  // Reset vehicle if material changes and current vehicle is not valid for new material
   useEffect(() => {
     if (!initialData && !isCustomVehicle && formData.vehicleNumber) {
         const isValid = availableVehicles.some(v => v.number === formData.vehicleNumber);
@@ -65,17 +62,13 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
 
   const handleVehicleSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
-    
     if (val === 'OTHER') {
       setIsCustomVehicle(true);
       setFormData(prev => ({ ...prev, vehicleNumber: '' }));
     } else {
       setIsCustomVehicle(false);
-      
-      // Auto-fill quantity if unit is Brass and vehicle is found
       const vehicle = PREDEFINED_VEHICLES.find(v => v.number === val);
       const currentUnit = UNITS[formData.material];
-      
       setFormData(prev => ({ 
         ...prev, 
         vehicleNumber: val,
@@ -89,7 +82,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
     setLoading(true);
     try {
       await onSubmit({
-        id: initialData?.id, // Pass ID if editing
+        id: initialData?.id,
         date: formData.date,
         challanNumber: formData.challanNumber,
         material: formData.material,
@@ -97,7 +90,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
         unit: UNITS[formData.material],
         vehicleNumber: formData.vehicleNumber,
         siteName: SITE_NAME,
-        createdBy: initialData ? initialData.createdBy : currentUser // Preserve original creator on edit
+        createdBy: initialData ? initialData.createdBy : currentUser
       });
     } catch (err) {
       console.error("Entry Save Error:", JSON.stringify(err, null, 2));
@@ -128,7 +121,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
               required
               value={formData.date}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
             />
           </div>
           <div>
@@ -140,7 +133,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
               placeholder="e.g. JME/2024/001"
               value={formData.challanNumber}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
             />
           </div>
         </div>
@@ -151,10 +144,8 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
             name="material"
             required
             value={formData.material}
-            onChange={(e) => {
-              handleChange(e);
-            }}
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+            onChange={handleChange}
+            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
           >
             {MATERIALS_LIST.map(m => (
               <option key={m} value={m}>{m}</option>
@@ -170,7 +161,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
                 required
                 value={formData.vehicleNumber}
                 onChange={handleVehicleSelect}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
               >
                 <option value="">-- Select Vehicle --</option>
                 {availableVehicles.map(v => (
@@ -211,11 +202,12 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
               type="number"
               name="quantity"
               step="0.01"
+              min="0"
               required
               placeholder="0.00"
               value={formData.quantity}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
             />
           </div>
         </div>

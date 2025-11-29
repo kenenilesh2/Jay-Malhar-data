@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   USER = 'USER'
@@ -59,12 +60,12 @@ export interface ChequeEntry {
   bankName: string;
   amount: number;
   status: 'Pending' | 'Cleared' | 'Bounced';
-  fileUrl?: string; // URL to the uploaded image/pdf
+  fileUrl?: string;
   createdBy: string;
   timestamp: number;
 }
 
-export type PageView = 'dashboard' | 'entries' | 'payments' | 'invoices' | 'cheques' | 'admin';
+export type PageView = 'dashboard' | 'entries' | 'payments' | 'invoices' | 'cheques' | 'client-ledger' | 'admin';
 
 export type InvoiceCategory = 'Building Material' | 'Water Supply' | 'Machinery';
 
@@ -77,4 +78,13 @@ export interface InvoiceItem {
   quantity: number;
   rate: number;
   amount: number;
+}
+
+export interface ClientLedgerEntry {
+  date: string;
+  particulars: string;
+  vchType: string;
+  vchNo: string;
+  debit: number;
+  credit: number;
 }

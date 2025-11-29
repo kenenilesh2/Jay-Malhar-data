@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { User, UserRole, PageView } from '../types';
 
@@ -13,7 +14,6 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const NavItem = ({ page, icon, label }: { page: PageView; icon: string; label: string }) => {
-    // Hide Admin tab for non-admins
     if (page === 'admin' && user.role !== UserRole.ADMIN) return null;
 
     const isActive = currentPage === page;
@@ -37,7 +37,6 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden">
-      {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col w-64 bg-slate-900 text-white shadow-xl z-20">
         <div className="p-6 border-b border-slate-700">
           <h1 className="text-lg font-bold bg-gradient-to-r from-brand-400 to-blue-300 bg-clip-text text-transparent leading-tight">
@@ -51,6 +50,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
           <NavItem page="entries" icon="fa-truck-loading" label="Material Entries" />
           <NavItem page="payments" icon="fa-money-bill-wave" label="Payments" />
           <NavItem page="cheques" icon="fa-money-check" label="Cheque Details" />
+          <NavItem page="client-ledger" icon="fa-book" label="Client Ledger" />
           <NavItem page="invoices" icon="fa-file-invoice-dollar" label="Invoices & Reports" />
           <NavItem page="admin" icon="fa-users-cog" label="User Management" />
         </nav>
@@ -75,7 +75,6 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
         </div>
       </aside>
 
-      {/* Mobile Header */}
       <div className="md:hidden fixed top-0 w-full bg-slate-900 text-white z-30 h-16 flex items-center justify-between px-4 shadow-md">
         <div>
           <h1 className="font-bold text-md">Jay Malhar Enterprises</h1>
@@ -89,7 +88,6 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
         </button>
       </div>
 
-      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 bg-slate-900 z-20 pt-20 px-4 md:hidden">
            <nav className="flex flex-col space-y-2">
@@ -97,6 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
             <NavItem page="entries" icon="fa-truck-loading" label="Material Entries" />
             <NavItem page="payments" icon="fa-money-bill-wave" label="Payments" />
             <NavItem page="cheques" icon="fa-money-check" label="Cheque Details" />
+            <NavItem page="client-ledger" icon="fa-book" label="Client Ledger" />
             <NavItem page="invoices" icon="fa-file-invoice-dollar" label="Invoices" />
             <NavItem page="admin" icon="fa-users-cog" label="User Management" />
             <button 
@@ -110,9 +109,8 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
         </div>
       )}
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto w-full pt-16 md:pt-0 bg-slate-50">
-        <div className="max-w-7xl mx-auto p-4 md:p-8">
+        <div className="max-w-7xl mx-auto p-4 md:p-8 h-full">
           {children}
         </div>
       </main>
