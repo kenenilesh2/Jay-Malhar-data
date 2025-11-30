@@ -37,25 +37,38 @@ const ClientLedger: React.FC = () => {
   // Helper to process row data based on user requirements
   const processRow = (item: ClientLedgerEntry) => {
     const part = (item.particulars || '').trim();
-    let derivedType = 'NA';
+    const partLower = part.toLowerCase();
+    
+    let derivedDrCr = 'NA';
     let derivedBankName = 'NA';
+    let derivedMaterialType = 'NA';
 
-    if (part.toLowerCase().startsWith('dr ') || part.toLowerCase().startsWith('dr.')) {
-      // If Dr, Put rest in Type, Bank is NA
-      derivedType = part.substring(2).trim().replace(/^\./, '').trim();
+    if (partLower.includes('dr ') || partLower.startsWith('dr.') || partLower === 'dr') {
+      // Logic: If particulars contains "DR"
+      // 1. Type = Dr
+      // 2. Material Type = Rest of string after DR
+      // 3. Bank Name = NA
+      derivedDrCr = 'Dr';
+      const match = part.match(/dr\.?\s*(.*)/i);
+      derivedMaterialType = match && match[1] ? match[1].trim() : part;
       derivedBankName = 'NA';
-    } else if (part.toLowerCase().startsWith('cr ') || part.toLowerCase().startsWith('cr.')) {
-      // If Cr, Put rest in Bank Name, Type is NA
-      derivedBankName = part.substring(2).trim().replace(/^\./, '').trim();
-      derivedType = 'NA';
+    } else if (partLower.includes('cr ') || partLower.startsWith('cr.') || partLower === 'cr') {
+      // Logic: If particulars contains "CR"
+      // 1. Type = Cr (or NA if preferred, usually Cr for ledger)
+      // 2. Material Type = NA
+      // 3. Bank Name = Rest of string after CR
+      derivedDrCr = 'Cr';
+      const match = part.match(/cr\.?\s*(.*)/i);
+      derivedBankName = match && match[1] ? match[1].trim() : part;
+      derivedMaterialType = 'NA';
     } else {
-      // Fallback if neither prefix exists (though data usually has it)
-      // Treating as Dr by default or just putting in Type? 
-      // User asked specific logic for Dr and Cr. Let's keep original in Type if unclear.
-      derivedType = part; 
+      // Fallback for items without Dr/Cr prefix
+      derivedDrCr = '-';
+      derivedMaterialType = part;
+      derivedBankName = 'NA';
     }
 
-    return { ...item, derivedType, derivedBankName };
+    return { ...item, derivedDrCr, derivedBankName, derivedMaterialType };
   };
 
   const processedData = useMemo(() => {
@@ -69,7 +82,7 @@ const ClientLedger: React.FC = () => {
         (item.particulars || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
         (item.vchNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.derivedType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.derivedMaterialType.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.derivedBankName.toLowerCase().includes(searchTerm.toLowerCase());
       
       // 2. Month Filter
@@ -128,7 +141,6 @@ const ClientLedger: React.FC = () => {
       const parsedEntries: ClientLedgerEntry[] = jsonData.map((row: any): ClientLedgerEntry | null => {
         const dateKey = Object.keys(row).find(k => k.toLowerCase().includes('date')) || 'Date';
         const particularsKey = Object.keys(row).find(k => k.toLowerCase() === 'particulars') || 'Particulars';
-        // We still parse other columns for storage, even if we don't display them all
         const vchTypeKey = Object.keys(row).find(k => k.toLowerCase().includes('vch type')) || 'Vch Type';
         const vchNoKey = Object.keys(row).find(k => k.toLowerCase().includes('vch no') || k.toLowerCase().includes('vch.')) || 'Vch No.';
         const debitKey = Object.keys(row).find(k => k.toLowerCase().includes('debit')) || 'Debit';
@@ -146,8 +158,8 @@ const ClientLedger: React.FC = () => {
         return {
           date: stdDate,
           particulars: row[particularsKey] ? String(row[particularsKey]).trim() : '',
-          drCr: '', // Can be derived or stored empty
-          accountName: '', // Can be derived or stored empty
+          drCr: '', 
+          accountName: '',
           vchType: row[vchTypeKey] ? String(row[vchTypeKey]).trim() : '',
           vchNo: row[vchNoKey] ? String(row[vchNoKey]).trim() : '',
           debit: cleanNumber(row[debitKey]),
@@ -190,12 +202,12 @@ const ClientLedger: React.FC = () => {
   const handleExportCSV = () => {
     if (filteredData.length === 0) return alert("No data to export");
     
-    // CSV Headers based on new requirement
-    const headers = ['Date', 'Type(DR/CR)', 'Bank Name', 'Vch Type', 'Vch No.', 'Debit', 'Credit', 'Description'];
+    const headers = ['Date', 'Type(DR/CR)', 'Material Type', 'Bank Name', 'Vch Type', 'Vch No.', 'Debit', 'Credit', 'Description'];
     
     const rows = filteredData.map(item => [
       item.date,
-      `"${item.derivedType.replace(/"/g, '""')}"`,
+      item.derivedDrCr,
+      `"${item.derivedMaterialType.replace(/"/g, '""')}"`,
       `"${item.derivedBankName.replace(/"/g, '""')}"`,
       item.vchType,
       item.vchNo,
@@ -303,7 +315,8 @@ const ClientLedger: React.FC = () => {
             <thead className="bg-slate-50 text-slate-500 font-semibold border-b sticky top-0 z-10 shadow-sm">
               <tr>
                 <th className="px-6 py-3 w-28 whitespace-nowrap">Date</th>
-                <th className="px-6 py-3 whitespace-nowrap">Type (DR/CR)</th>
+                <th className="px-6 py-3 w-24 whitespace-nowrap">Type (DR/CR)</th>
+                <th className="px-6 py-3 whitespace-nowrap">Material Type</th>
                 <th className="px-6 py-3 whitespace-nowrap">Bank Name</th>
                 <th className="px-6 py-3 w-24 whitespace-nowrap">Vch Type</th>
                 <th className="px-6 py-3 w-24 whitespace-nowrap">Vch No.</th>
@@ -317,14 +330,21 @@ const ClientLedger: React.FC = () => {
                 <tr key={idx} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-6 py-3 text-slate-500 font-mono text-xs whitespace-nowrap">{item.date}</td>
                   
-                  {/* Type (DR/CR) */}
-                  <td className="px-6 py-3 font-medium text-slate-700">
-                    {item.derivedType !== 'NA' ? item.derivedType : <span className="text-slate-300">NA</span>}
+                  <td className="px-6 py-3 font-medium text-slate-700 whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                        item.derivedDrCr === 'Dr' ? 'bg-blue-50 text-blue-700' : 
+                        item.derivedDrCr === 'NA' ? 'text-slate-300' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                        {item.derivedDrCr}
+                    </span>
                   </td>
-                  
-                  {/* Bank Name */}
-                  <td className="px-6 py-3 font-medium text-slate-700">
-                     {item.derivedBankName !== 'NA' ? item.derivedBankName : <span className="text-slate-300">NA</span>}
+
+                  <td className="px-6 py-3 font-medium text-slate-700 whitespace-nowrap">
+                     {item.derivedMaterialType !== 'NA' ? item.derivedMaterialType : <span className="text-slate-300">-</span>}
+                  </td>
+
+                  <td className="px-6 py-3 font-medium text-slate-700 whitespace-nowrap">
+                     {item.derivedBankName !== 'NA' ? item.derivedBankName : <span className="text-slate-300">-</span>}
                   </td>
 
                   <td className="px-6 py-3 whitespace-nowrap">
@@ -350,7 +370,7 @@ const ClientLedger: React.FC = () => {
               ))}
               {filteredData.length === 0 && (
                 <tr>
-                    <td colSpan={8} className="text-center py-12 text-slate-400">No records found</td>
+                    <td colSpan={9} className="text-center py-12 text-slate-400">No records found</td>
                 </tr>
               )}
             </tbody>
@@ -375,16 +395,11 @@ const ClientLedger: React.FC = () => {
             </div>
             
             <div className="flex-1 overflow-auto p-6">
-              {uploadError && (
-                <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4 border border-red-200 flex items-center">
-                  <i className="fas fa-exclamation-triangle mr-2 text-xl"></i> {uploadError}
-                </div>
-              )}
               <table className="w-full text-xs bg-white rounded border border-slate-200">
                 <thead className="bg-slate-100 text-slate-600 font-semibold sticky top-0">
                   <tr>
                     <th className="p-3 text-left w-24">Date</th>
-                    <th className="p-3 text-left">Particulars (Original)</th>
+                    <th className="p-3 text-left">Particulars</th>
                     <th className="p-3 text-left w-20">Type</th>
                     <th className="p-3 text-right w-24">Debit</th>
                     <th className="p-3 text-right w-24">Credit</th>
@@ -400,13 +415,6 @@ const ClientLedger: React.FC = () => {
                       <td className="p-3 text-right text-red-600">{row.credit || '-'}</td>
                     </tr>
                   ))}
-                  {uploadPreview.length > 100 && (
-                      <tr>
-                          <td colSpan={5} className="p-4 text-center text-slate-500 bg-slate-50 font-medium">
-                              ... and {uploadPreview.length - 100} more records
-                          </td>
-                      </tr>
-                  )}
                 </tbody>
               </table>
             </div>
