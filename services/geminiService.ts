@@ -1,7 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { MaterialEntry, SupplierPayment } from "../types";
-import { CLIENT_LEDGER_DATA } from "./clientLedgerData";
 
 export const analyzeBusinessData = async (
   entries: MaterialEntry[], 
@@ -23,27 +22,16 @@ export const analyzeBusinessData = async (
     u: e.unit
   }));
 
-  // Summarize Ledger Data
-  const totalBilled = CLIENT_LEDGER_DATA.reduce((acc, curr) => acc + curr.credit, 0);
-  const totalReceived = CLIENT_LEDGER_DATA.reduce((acc, curr) => acc + curr.debit, 0);
-  
-  const ledgerContext = {
-    summary: `Historical Data (Arihant Ledger): Total Billed: ${totalBilled}, Total Received: ${totalReceived}`,
-    recentTransactions: CLIENT_LEDGER_DATA.slice(-15)
-  };
-
   const prompt = `
     You are an AI assistant for "Jay Malhar Enterprises".
     
     Data Context:
     1. Daily Site Entries (System): ${JSON.stringify(entriesContext)}
-    2. Client Ledger (Arihant Superstructures): ${JSON.stringify(ledgerContext)}
     
     User Question: "${question}"
     
     Answer concisely. 
-    - Use "Client Ledger" data if asked about "Arihant", "Client Billing", "History" or "Ledger".
-    - Use "Daily Site Entries" if asked about specific material loads recently.
+    Use the Daily Entries if the user asks about "Material supplied today/recently".
   `;
 
   try {

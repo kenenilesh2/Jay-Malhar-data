@@ -117,7 +117,8 @@ export const generateMonthlyInvoicePDF = (
   doc.save(`Invoice_${category}_${month}.pdf`);
 };
 
-export const generateLedgerPDF = (entries: ClientLedgerEntry[], periodLabel: string) => {
+// Updated ledger PDF generation with new columns logic
+export const generateLedgerPDF = (entries: any[], periodLabel: string) => {
   const doc = new jsPDF();
   
   addHeader(doc, "CLIENT LEDGER STATEMENT");
@@ -127,10 +128,13 @@ export const generateLedgerPDF = (entries: ClientLedgerEntry[], periodLabel: str
   doc.text(`Site: ${SITE_NAME}`, 15, 70);
   doc.text(`Period: ${periodLabel}`, 140, 65);
   
-  const tableHead = [['Date', 'Particulars', 'Vch Type', 'Vch No.', 'Debit (Received)', 'Credit (Billed)']];
+  // Table headers reflecting the new structure
+  const tableHead = [['Date', 'Type(DR/CR)', 'Bank Name', 'Vch Type', 'Vch No.', 'Debit', 'Credit']];
+  
   const tableBody = entries.map(item => [
     item.date,
-    item.particulars,
+    item.derivedType !== 'NA' ? item.derivedType : '-',
+    item.derivedBankName !== 'NA' ? item.derivedBankName : '-',
     item.vchType,
     item.vchNo,
     item.debit > 0 ? formatCurrencyPDF(item.debit) : '-',
@@ -145,15 +149,18 @@ export const generateLedgerPDF = (entries: ClientLedgerEntry[], periodLabel: str
     headStyles: { fillColor: [44, 62, 80] },
     styles: { fontSize: 8, cellPadding: 2 },
     columnStyles: {
-      0: { cellWidth: 20 },
-      1: { cellWidth: 'auto' },
-      4: { cellWidth: 30, halign: 'right', textColor: [22, 163, 74] },
-      5: { cellWidth: 30, halign: 'right', textColor: [220, 38, 38] },
+      0: { cellWidth: 20 }, // Date
+      1: { cellWidth: 30 }, // Type
+      2: { cellWidth: 40 }, // Bank
+      3: { cellWidth: 20 }, // Vch Type
+      4: { cellWidth: 20 }, // Vch No
+      5: { cellWidth: 25, halign: 'right', textColor: [22, 163, 74] }, // Debit
+      6: { cellWidth: 25, halign: 'right', textColor: [220, 38, 38] }, // Credit
     },
   });
   
-  const totalDebit = entries.reduce((sum, item) => sum + item.debit, 0);
-  const totalCredit = entries.reduce((sum, item) => sum + item.credit, 0);
+  const totalDebit = entries.reduce((sum, item) => sum + (Number(item.debit) || 0), 0);
+  const totalCredit = entries.reduce((sum, item) => sum + (Number(item.credit) || 0), 0);
   const balance = totalCredit - totalDebit;
   
   const finalY = (doc as any).lastAutoTable.finalY + 10;
@@ -163,8 +170,10 @@ export const generateLedgerPDF = (entries: ClientLedgerEntry[], periodLabel: str
   doc.setFontSize(10);
   doc.text(`Total Billed (Credit):`, labelX, finalY);
   doc.text(formatCurrencyPDF(totalCredit), valueX, finalY, { align: 'right' });
+  
   doc.text(`Total Received (Debit):`, labelX, finalY + 6);
   doc.text(formatCurrencyPDF(totalDebit), valueX, finalY + 6, { align: 'right' });
+  
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text(`Closing Balance:`, labelX, finalY + 16);

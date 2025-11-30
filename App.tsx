@@ -41,7 +41,7 @@ function App() {
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
+    let timeout: ReturnType<typeof setTimeout>;
     const resetTimer = () => {
       if (currentUser) {
         clearTimeout(timeout);
@@ -261,10 +261,10 @@ function App() {
         );
       case 'cheques':
         return <ChequeManager currentUser={currentUser.name} cheques={cheques} onAddCheque={handleAddCheque} onDeleteCheque={handleDeleteCheque} isAdmin={isAdmin} />;
-      case 'client-ledger':
-        return <ClientLedger />;
       case 'invoices':
         return <InvoiceGenerator entries={entries} />;
+      case 'client-ledger':
+        return <ClientLedger />;
       case 'admin':
         if (!isAdmin) return <div>Access Denied</div>;
         return (

@@ -81,10 +81,14 @@ export interface InvoiceItem {
 }
 
 export interface ClientLedgerEntry {
+  id?: string;
   date: string;
   particulars: string;
+  drCr?: string;
+  accountName?: string;
   vchType: string;
   vchNo: string;
   debit: number;
   credit: number;
+  description?: string;
 }

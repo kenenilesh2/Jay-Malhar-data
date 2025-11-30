@@ -95,7 +95,7 @@ create table if not exists users (
   created_at timestamptz default now()
 );
 
--- 4. Cheque Entries Table (NEW)
+-- 4. Cheque Entries Table
 create table if not exists cheque_entries (
   id uuid default gen_random_uuid() primary key,
   date date not null,
@@ -109,35 +109,36 @@ create table if not exists cheque_entries (
   created_at timestamptz default now()
 );
 
--- 5. STORAGE BUCKET SETUP (Run this separately to enable file uploads)
--- Insert a new bucket named 'cheques'
-insert into storage.buckets (id, name, public) values ('cheques', 'cheques', true);
+-- 5. Client Ledger Table (For Bulk Uploads)
+create table if not exists client_ledger (
+  id uuid default gen_random_uuid() primary key,
+  date text,
+  particulars text,
+  dr_cr text,
+  account_name text,
+  vch_type text,
+  vch_no text,
+  debit numeric default 0,
+  credit numeric default 0,
+  description text,
+  created_at timestamptz default now()
+);
 
--- Enable RLS for Storage
+-- 6. STORAGE BUCKET SETUP
+insert into storage.buckets (id, name, public) values ('cheques', 'cheques', true);
 create policy "Public Access" on storage.objects for all using ( bucket_id = 'cheques' );
 
 
--- 6. SCHEMA REPAIR (Run this if you get "column not found" errors)
-alter table entries add column if not exists material text;
-alter table entries add column if not exists challan_number text;
-alter table entries add column if not exists vehicle_number text;
-alter table entries add column if not exists site_name text;
-
--- 7. RLS POLICIES (REQUIRED FOR DELETE TO WORK) --
+-- 7. SCHEMA REPAIR & RLS
 alter table entries enable row level security;
 alter table payments enable row level security;
 alter table users enable row level security;
 alter table cheque_entries enable row level security;
+alter table client_ledger enable row level security;
 
--- Drop existing policies to prevent conflicts
-drop policy if exists "Public access entries" on entries;
-drop policy if exists "Public access payments" on payments;
-drop policy if exists "Public access users" on users;
-drop policy if exists "Public access cheques" on cheque_entries;
-
--- Allow ALL operations (Insert, Update, DELETE, Select) for public users
 create policy "Public access entries" on entries for all using (true) with check (true);
 create policy "Public access payments" on payments for all using (true) with check (true);
 create policy "Public access users" on users for all using (true) with check (true);
 create policy "Public access cheques" on cheque_entries for all using (true) with check (true);
+create policy "Public access ledger" on client_ledger for all using (true) with check (true);
 */
