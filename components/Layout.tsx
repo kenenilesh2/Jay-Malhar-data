@@ -50,8 +50,9 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
           <NavItem page="entries" icon="fa-truck-loading" label="Material Entries" />
           <NavItem page="payments" icon="fa-money-bill-wave" label="Payments" />
           <NavItem page="cheques" icon="fa-money-check" label="Cheque Details" />
-          <NavItem page="invoices" icon="fa-file-invoice-dollar" label="Invoices & Reports" />
           <NavItem page="client-ledger" icon="fa-book" label="Client Ledger" />
+          <NavItem page="invoices" icon="fa-file-invoice-dollar" label="Invoices" />
+          <NavItem page="invoice-summary" icon="fa-list-alt" label="Invoice Summary" />
           <NavItem page="admin" icon="fa-users-cog" label="User Management" />
         </nav>
 
@@ -95,8 +96,9 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentPage, onNavigate
             <NavItem page="entries" icon="fa-truck-loading" label="Material Entries" />
             <NavItem page="payments" icon="fa-money-bill-wave" label="Payments" />
             <NavItem page="cheques" icon="fa-money-check" label="Cheque Details" />
-            <NavItem page="invoices" icon="fa-file-invoice-dollar" label="Invoices" />
             <NavItem page="client-ledger" icon="fa-book" label="Client Ledger" />
+            <NavItem page="invoices" icon="fa-file-invoice-dollar" label="Invoices" />
+            <NavItem page="invoice-summary" icon="fa-list-alt" label="Invoice Summary" />
             <NavItem page="admin" icon="fa-users-cog" label="User Management" />
             <button 
               onClick={onLogout}

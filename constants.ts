@@ -1,3 +1,4 @@
+
 import { User, UserRole, MaterialType, InvoiceCategory } from './types';
 
 export const INITIAL_USERS: User[] = [
@@ -52,6 +53,17 @@ export const UNITS: Record<string, string> = {
 };
 
 export const SITE_NAME = "Arihant Aaradhya";
+
+export const PHASES_LIST = [
+  "Phase - 1",
+  "Phase - 2",
+  "Phase - 3",
+  "Phase - 4",
+  "Phase - 5",
+  "Phase - 6",
+  "Phase - 7",
+  "Any other"
+];
 
 // --- COMPANY DETAILS FOR PDF (MATCHING IMAGE) ---
 export const COMPANY_DETAILS = {

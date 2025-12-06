@@ -1,3 +1,4 @@
+
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Keys for LocalStorage
@@ -69,6 +70,7 @@ create table if not exists entries (
   unit text,
   vehicle_number text,
   site_name text,
+  phase text, -- Added Phase Column
   created_by text,
   created_at timestamptz default now()
 );
@@ -156,4 +158,7 @@ create policy "Public access users" on users for all using (true) with check (tr
 create policy "Public access cheques" on cheque_entries for all using (true) with check (true);
 create policy "Public access ledger" on client_ledger for all using (true) with check (true);
 create policy "Public access invoices" on generated_invoices for all using (true) with check (true);
+
+-- 9. SCHEMA ALTERATION FOR PHASE
+-- ALTER TABLE entries ADD COLUMN IF NOT EXISTS phase text;
 */

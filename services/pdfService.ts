@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { MaterialEntry, InvoiceItem, InvoiceCategory, ClientLedgerEntry } from '../types';
+import { MaterialEntry, InvoiceItem, InvoiceCategory, ClientLedgerEntry, SummaryReportEntry } from '../types';
 import { GST_RATES, SITE_NAME, COMPANY_DETAILS, CUSTOMER_DETAILS } from '../constants';
 
 // Helper: Convert Number to Indian Currency Words
@@ -67,7 +67,6 @@ export const generateChallanPDF = (entry: MaterialEntry) => {
   doc.save(`Challan_${entry.challanNumber}.pdf`);
 };
 
-// --- MAIN INVOICE GENERATOR MATCHING IMAGE ---
 export const generateMonthlyInvoicePDF = (
   month: string, 
   category: InvoiceCategory, 
@@ -75,127 +74,111 @@ export const generateMonthlyInvoicePDF = (
   totalBase: number,
   totalTax: number,
   grandTotal: number,
-  subCategory?: string // Added subCategory parameter
+  subCategory?: string
 ): { blob: Blob; filename: string } => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   
-  // --- 1. HEADER SECTION ---
+  // --- HEADER ---
   doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
   doc.text("TAX INVOICE", pageWidth / 2, 8, { align: 'center' });
-
   doc.setFontSize(26);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(60, 0, 0); // Dark brownish red
+  doc.setTextColor(60, 0, 0);
   doc.text(COMPANY_DETAILS.name, pageWidth / 2, 18, { align: 'center' });
-  
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
   doc.text(COMPANY_DETAILS.subtitle, pageWidth / 2, 24, { align: 'center' });
-
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text(`Address : ${COMPANY_DETAILS.address}`, pageWidth / 2, 29, { align: 'center' });
-  
-  // Line separator
   doc.setLineWidth(0.5);
   doc.line(10, 32, pageWidth - 10, 32);
-
-  // GSTIN Line
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.text(`GSTIN No. : ${COMPANY_DETAILS.gstin}`, 15, 37);
   doc.text(`State : Maharashtra`, pageWidth / 2, 37, { align: 'center' });
   doc.text(`State Code : ${COMPANY_DETAILS.stateCode}`, pageWidth - 15, 37, { align: 'right' });
-
   doc.line(10, 40, pageWidth - 10, 40);
 
-  // --- 2. INVOICE INFO ---
-  // Mock Invoice No logic
+  // --- INVOICE INFO ---
   const invNo = `55/${month.slice(2,4)}-${(parseInt(month.slice(2,4))+1)}`; 
-  const invDate = new Date().toLocaleDateString('en-IN'); // Today's date
+  const invDate = new Date().toLocaleDateString('en-IN'); 
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text(`Invoice No. : ${invNo}`, 15, 46);
   doc.text(`Invoice Date : ${invDate}`, pageWidth - 15, 46, { align: 'right' });
 
-  // Optional: Display Sub-category if filtered
   if (subCategory && subCategory !== 'All') {
       doc.setFontSize(9);
       doc.text(`Sub-Category : ${subCategory}`, 15, 49.5);
   }
 
-  // --- 3. PARTY DETAILS ---
+  // --- PARTY DETAILS ---
   doc.setFont('helvetica', 'bold');
   doc.text("Party Name", 15, 52);
   doc.text(`  ${CUSTOMER_DETAILS.name}`, 36, 52); 
-
   doc.setFont('helvetica', 'normal');
   doc.text("Address", 15, 57);
   const addressLines = doc.splitTextToSize(CUSTOMER_DETAILS.address, pageWidth - 50);
   doc.setFont('helvetica', 'bold');
   doc.text(addressLines, 36, 57);
-
   let currentY = 57 + (addressLines.length * 5);
-
   doc.text(`GSTIN No. : ${CUSTOMER_DETAILS.gstin}`, 15, currentY);
   doc.text(`State : MAHARASHTRA`, 115, currentY);
   doc.text(`State Code ${CUSTOMER_DETAILS.stateCode}`, pageWidth - 15, currentY, { align: 'right' });
-
   currentY += 3;
   doc.line(10, currentY, pageWidth - 10, currentY);
 
-  // --- 4. AGGREGATE ITEMS (GROUP BY VEHICLE & DESC) ---
-  interface AggregatedItem {
-    vehicleNumber: string;
+  // --- GROUPING LOGIC (VEHICLE + DESCRIPTION) ---
+  interface GroupedRow {
+    vehicle: string;
     description: string;
     quantity: number;
     rate: number;
     amount: number;
   }
 
-  const aggregatedMap: Record<string, AggregatedItem> = {};
+  const groupedData: Record<string, GroupedRow> = {};
 
   items.forEach(item => {
+    // Create a composite key for Vehicle + Description
     const key = `${item.vehicleNumber}||${item.description}`;
-    if (!aggregatedMap[key]) {
-      aggregatedMap[key] = {
-        vehicleNumber: item.vehicleNumber,
+    
+    if (!groupedData[key]) {
+      groupedData[key] = {
+        vehicle: item.vehicleNumber,
         description: item.description,
         quantity: 0,
-        rate: item.rate,
+        rate: item.rate, // Assuming rate is consistent for same material/vehicle
         amount: 0
       };
     }
-    aggregatedMap[key].quantity += item.quantity;
-    aggregatedMap[key].amount += item.amount;
+    
+    groupedData[key].quantity += item.quantity;
+    groupedData[key].amount += item.amount;
   });
 
-  const tableData = Object.values(aggregatedMap).sort((a, b) => {
-      // Sort by Vehicle Number then Description
-      if (a.vehicleNumber < b.vehicleNumber) return -1;
-      if (a.vehicleNumber > b.vehicleNumber) return 1;
-      if (a.description < b.description) return -1;
-      if (a.description > b.description) return 1;
-      return 0;
-  }).map(item => [
-    '', // Date (Empty as requested)
-    '', // Challan No (Empty as requested)
-    item.vehicleNumber,
-    item.description,
-    item.quantity.toFixed(2),
-    Math.round(item.rate),
-    Math.round(item.amount) 
+  // Convert map to array and sort
+  const tableRows = Object.values(groupedData).sort((a, b) => {
+    if (a.vehicle < b.vehicle) return -1;
+    if (a.vehicle > b.vehicle) return 1;
+    return 0;
+  }).map(row => [
+    '',                 // Date (Requested Empty)
+    '',                 // Challan (Requested Empty)
+    row.vehicle,        // Lorry No.
+    row.description,    // Description
+    row.quantity.toFixed(2), 
+    Math.round(row.rate),
+    Math.round(row.amount)
   ]);
 
-  // Draw Table
   autoTable(doc, {
     startY: currentY + 2,
     head: [['Date', 'Challan\nNo.', 'Lorry No.', 'DESCRIPTION', 'Quantity', 'RATE', 'Amount\nRs.']],
-    body: tableData,
+    body: tableRows,
     theme: 'plain', 
     styles: { 
       fontSize: 10, 
@@ -214,62 +197,53 @@ export const generateMonthlyInvoicePDF = (
       lineColor: [0, 0, 0]
     },
     columnStyles: {
-      0: { cellWidth: 15, halign: 'center' }, // Date
-      1: { cellWidth: 18, halign: 'center' }, // Challan
-      2: { cellWidth: 28, halign: 'center', fontStyle: 'bold' }, // Lorry
-      3: { cellWidth: 'auto', halign: 'left' }, // Desc
-      4: { cellWidth: 18, halign: 'center' }, // Qty
-      5: { cellWidth: 20, halign: 'center' }, // Rate
-      6: { cellWidth: 30, halign: 'right' }, // Amount
+      0: { cellWidth: 15, halign: 'center' }, 
+      1: { cellWidth: 18, halign: 'center' }, 
+      2: { cellWidth: 28, halign: 'center', fontStyle: 'bold' }, 
+      3: { cellWidth: 'auto', halign: 'left' }, 
+      4: { cellWidth: 18, halign: 'center' }, 
+      5: { cellWidth: 20, halign: 'center' }, 
+      6: { cellWidth: 30, halign: 'right' }, 
     },
     margin: { left: 10, right: 10 },
   });
 
-  // --- 5. FOOTER ---
+  // --- FOOTER ---
   let finalY = (doc as any).lastAutoTable.finalY;
-  
   if (finalY > 220) {
     doc.addPage();
     finalY = 20;
   }
-
   const bottomStart = finalY;
   const bottomEnd = 280;
   const boxHeight = bottomEnd - bottomStart;
   
-  doc.rect(10, bottomStart, pageWidth - 20, boxHeight); // Main Footer Box
-
+  doc.rect(10, bottomStart, pageWidth - 20, boxHeight);
   const splitX = 145; 
   doc.line(splitX, bottomStart, splitX, bottomEnd);
 
-  // -- LEFT SIDE CONTENT --
+  // Left Side
   let leftY = bottomStart + 5;
-  
-  // Amount in Words
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text("Total Invoice Amount (Including GST)", 12, leftY);
-  
   doc.setFont('helvetica', 'bolditalic');
   const words = numberToWords(Math.round(grandTotal));
   const wordLines = doc.splitTextToSize(words, splitX - 15);
   doc.text(wordLines, 12, leftY + 5);
   
-  // Bank Details Section
   leftY += 15 + (wordLines.length * 4);
-  doc.line(10, leftY, splitX, leftY); // Separator
+  doc.line(10, leftY, splitX, leftY);
   
   leftY += 5;
   doc.setFont('helvetica', 'bold');
   doc.text("Bank Details", 12, leftY);
-  
   leftY += 5;
   doc.setFont('helvetica', 'normal');
   doc.text(`Bank Name : ${COMPANY_DETAILS.bankName}`, 12, leftY);
   doc.text(`A/C No. : ${COMPANY_DETAILS.acNo}`, 12, leftY + 5);
   doc.text(`IFSC Code : ${COMPANY_DETAILS.ifsc}`, 12, leftY + 10);
 
-  // Declaration
   const decY = bottomEnd - 35;
   doc.line(10, decY, splitX, decY);
   doc.setFontSize(7);
@@ -279,7 +253,7 @@ export const generateMonthlyInvoicePDF = (
   doc.text("2) Error and Omission Excepted.", 12, decY + 14);
   doc.text("3) Subject to Kalyan Jurisdiction", 12, decY + 17);
 
-  // -- RIGHT SIDE CONTENT (TOTALS) --
+  // Right Side
   const taxes = GST_RATES[category];
   const rightLabelX = splitX + 2;
   const rightValueX = pageWidth - 12;
@@ -308,7 +282,6 @@ export const generateMonthlyInvoicePDF = (
   
   drawTotalRow("Round Off", "0");
 
-  // G. TOTAL
   doc.setFont('helvetica', 'bold');
   doc.text("G. TOTAL", rightLabelX, rightY + 5.5);
   doc.text(Math.round(grandTotal).toString(), rightValueX, rightY + 5.5, { align: 'right' });
@@ -325,6 +298,121 @@ export const generateMonthlyInvoicePDF = (
   return { blob: doc.output('blob'), filename };
 };
 
+// --- SUMMARY PDF GENERATOR (UPDATED FOR WATER SUPPLY) ---
+export const generateSummaryPDF = (
+  items: SummaryReportEntry[],
+  title: string,
+  category: string,
+  subCategory?: string
+) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.width;
+
+  // Header
+  doc.setFillColor(14, 165, 233); // Brand color
+  doc.rect(0, 0, pageWidth, 35, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text("JAY MALHAR ENTERPRISES", pageWidth / 2, 15, { align: 'center' });
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text("Supply Chain & Material Management", pageWidth / 2, 22, { align: 'center' });
+  doc.text(title, pageWidth / 2, 30, { align: 'center' });
+
+  doc.setTextColor(0, 0, 0);
+
+  // Totals Calculation
+  const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
+
+  // --- WATER SUPPLY FORMAT (DRINKING WATER) ---
+  if (category === 'Water Supply' && subCategory === 'Drinking Water') {
+      const waterData = items.map(item => [
+          item.date,
+          item.vehicleNumber,
+          item.material,
+          item.quantity.toString(),
+          item.rate.toString()
+          // Amount column deliberately omitted from BODY
+      ]);
+
+      autoTable(doc, {
+          startY: 40,
+          head: [['DATE', 'LORRY NO', 'DESCRIPTION', 'QUANTITY', 'RATE']], // Updated Headers
+          body: waterData,
+          theme: 'grid',
+          headStyles: { fillColor: [255, 255, 255], textColor: [0,0,0], fontStyle: 'bold', lineWidth: 0.1, lineColor: [0,0,0] },
+          styles: { fontSize: 10, lineColor: [0,0,0], lineWidth: 0.1, textColor: [0,0,0], cellPadding: 2, halign: 'center' },
+          columnStyles: {
+              2: { halign: 'left' } // Description
+          },
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY;
+      
+      // Draw Total Row manually to match image style (Yellow background)
+      autoTable(doc, {
+          startY: finalY,
+          head: [['', '', 'Total', totalQty.toString(), totalAmount.toString()]],
+          body: [],
+          theme: 'grid',
+          showHead: 'firstPage',
+          headStyles: { 
+              fillColor: [255, 255, 0], // Yellow
+              textColor: [0,0,0], 
+              fontStyle: 'bold', 
+              lineWidth: 0.1, 
+              lineColor: [0,0,0],
+              halign: 'center'
+          },
+          columnStyles: {
+            2: { halign: 'right' }
+          }
+      });
+
+  } else {
+      // --- STANDARD FORMAT (Building Material / Machinery / Other Water) ---
+      const tableData = items.map(item => [
+        item.srNo,
+        item.date,
+        item.challanNumber,
+        item.vehicleNumber,
+        item.material,
+        item.quantity.toString(),
+        formatCurrencyPDF(item.rate),
+        formatCurrencyPDF(item.amount)
+      ]);
+
+      autoTable(doc, {
+        startY: 40,
+        head: [['Sr No', 'Date', 'Challan', 'Vehicle No.', 'Material', 'Qty', 'Rate', 'Amount']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [14, 165, 233] },
+        styles: { fontSize: 9 },
+        columnStyles: {
+          0: { cellWidth: 15, halign: 'center' },
+          5: { halign: 'right' },
+          6: { halign: 'right' },
+          7: { halign: 'right' }
+        }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY + 10;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Grand Totals:", 15, finalY);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Quantity: ${totalQty.toFixed(2)}`, 15, finalY + 7);
+      doc.text(`Total Amount: ${formatCurrencyPDF(totalAmount)}`, 15, finalY + 14);
+  }
+
+  doc.save(`${title.replace(/ /g, '_')}.pdf`);
+};
+
+// --- LEDGER PDF EXPORT (Required for ClientLedger.tsx) ---
 export const generateLedgerPDF = (entries: ClientLedgerEntry[], periodLabel: string) => {
   const doc = new jsPDF();
   addHeader(doc, "CLIENT LEDGER STATEMENT");
@@ -346,12 +434,7 @@ export const generateLedgerPDF = (entries: ClientLedgerEntry[], periodLabel: str
     theme: 'striped',
     headStyles: { fillColor: [44, 62, 80] },
     styles: { fontSize: 8, cellPadding: 2 },
-    columnStyles: { 
-      0: { cellWidth: 20 }, 
-      1: { cellWidth: 'auto' }, 
-      4: { cellWidth: 30, halign: 'right', textColor: [22, 163, 74] }, 
-      5: { cellWidth: 30, halign: 'right', textColor: [220, 38, 38] } 
-    },
+    columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 'auto' }, 4: { cellWidth: 30, halign: 'right', textColor: [22, 163, 74] }, 5: { cellWidth: 30, halign: 'right', textColor: [220, 38, 38] } },
   });
   
   const totalDebit = entries.reduce((sum, item) => sum + item.debit, 0);

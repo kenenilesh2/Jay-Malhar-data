@@ -1,7 +1,7 @@
 
-import { MaterialEntry, SupplierPayment, User, ChequeEntry, ClientLedgerEntry, GeneratedInvoice } from '../types';
+import { MaterialEntry, SupplierPayment, User, ChequeEntry, ClientLedgerEntry, GeneratedInvoice, MaterialType } from '../types';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
-import { INITIAL_USERS } from '../constants';
+import { INITIAL_USERS, SITE_NAME } from '../constants';
 
 // Keys for LocalStorage fallback
 const LS_KEYS = {
@@ -119,7 +119,7 @@ export const addEntry = async (entry: Omit<MaterialEntry, 'id' | 'timestamp'>): 
     const { data, error } = await supabase.from('entries').insert([{ 
         date: entry.date, challan_number: entry.challanNumber, material: entry.material,
         quantity: entry.quantity, unit: entry.unit, vehicle_number: entry.vehicleNumber,
-        site_name: entry.siteName, created_by: entry.createdBy
+        site_name: entry.siteName, phase: entry.phase, created_by: entry.createdBy
       }]).select().single();
     if (error) { logSupabaseError('addEntry', error); throw error; }
     return { ...entry, id: data.id, timestamp: new Date(data.created_at).getTime() };
@@ -131,11 +131,70 @@ export const addEntry = async (entry: Omit<MaterialEntry, 'id' | 'timestamp'>): 
   }
 };
 
+export const bulkAddEntries = async (entries: Omit<MaterialEntry, 'id' | 'timestamp'>[]): Promise<void> => {
+    if (isSupabaseConfigured() && supabase) {
+        const dbEntries = entries.map(e => ({
+            date: e.date,
+            challan_number: e.challanNumber,
+            material: e.material,
+            quantity: e.quantity,
+            unit: e.unit,
+            vehicle_number: e.vehicleNumber,
+            site_name: e.siteName,
+            phase: e.phase,
+            created_by: e.createdBy
+        }));
+        
+        const { error } = await supabase.from('entries').insert(dbEntries);
+        if (error) {
+            logSupabaseError('bulkAddEntries', error);
+            throw error;
+        }
+    } else {
+        const current = await getEntries();
+        const newEntries = entries.map(e => ({
+            ...e,
+            id: Math.random().toString(36).substr(2, 9),
+            timestamp: Date.now()
+        }));
+        localStorage.setItem(LS_KEYS.ENTRIES, JSON.stringify([...current, ...newEntries]));
+    }
+};
+
+// UTILITY: BULK INSERT SPECIFIC SCENARIO
+export const seedNovemberWaterEntries = async () => {
+  if (isSupabaseConfigured() && supabase) {
+    const entries = [];
+    for (let day = 1; day <= 30; day++) {
+      const dateStr = `2025-11-${String(day).padStart(2, '0')}`;
+      entries.push({
+        date: dateStr,
+        challan_number: `AUTO/NOV25/${day}`,
+        material: MaterialType.DRINKING_WATER,
+        quantity: 1,
+        unit: 'Tanker',
+        vehicle_number: 'MH05K8980',
+        site_name: SITE_NAME,
+        created_by: 'Admin (Bulk Tool)'
+      });
+    }
+
+    const { error } = await supabase.from('entries').insert(entries);
+    if (error) {
+      console.error("Bulk Insert Failed:", error);
+      return false;
+    }
+    return true;
+  }
+  return false;
+};
+
 export const updateEntry = async (id: string, entry: Partial<MaterialEntry>): Promise<void> => {
   if (isSupabaseConfigured() && supabase) {
     const { error } = await supabase.from('entries').update({
         date: entry.date, challan_number: entry.challanNumber, material: entry.material,
-        quantity: entry.quantity, unit: entry.unit, vehicle_number: entry.vehicleNumber, site_name: entry.siteName,
+        quantity: entry.quantity, unit: entry.unit, vehicle_number: entry.vehicleNumber, 
+        site_name: entry.siteName, phase: entry.phase
       }).eq('id', id);
     if (error) { logSupabaseError('updateEntry', error); throw error; }
   } else {
@@ -166,7 +225,7 @@ export const getEntries = async (): Promise<MaterialEntry[]> => {
     return data.map((d: any) => ({
       id: d.id, date: d.date, challanNumber: d.challan_number, material: d.material,
       quantity: Number(d.quantity), unit: d.unit, vehicleNumber: d.vehicle_number,
-      siteName: d.site_name, createdBy: d.created_by, timestamp: new Date(d.created_at).getTime()
+      siteName: d.site_name, phase: d.phase, createdBy: d.created_by, timestamp: new Date(d.created_at).getTime()
     }));
   } else {
     return safeJsonParse(localStorage.getItem(LS_KEYS.ENTRIES), []);
@@ -369,7 +428,7 @@ export const saveGeneratedInvoice = async (month: string, category: string, tota
       month,
       category,
       totalAmount,
-      fileUrl: '#', // No real URL in local mode
+      fileUrl: '#', 
       createdAt: new Date().toISOString()
     };
     const current = safeJsonParse<GeneratedInvoice[]>(localStorage.getItem(LS_KEYS.INVOICES), []);

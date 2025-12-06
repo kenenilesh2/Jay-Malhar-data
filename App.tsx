@@ -7,6 +7,7 @@ import EntryForm from './components/EntryForm';
 import PaymentForm from './components/PaymentForm';
 import DataTable from './components/DataTable';
 import InvoiceGenerator from './components/InvoiceGenerator';
+import InvoiceSummary from './components/InvoiceSummary'; // New Import
 import ChequeManager from './components/ChequeManager';
 import ClientLedger from './components/ClientLedger';
 import { User, MaterialEntry, SupplierPayment, PageView, MaterialType, UserRole, ChequeEntry } from './types';
@@ -237,6 +238,7 @@ function App() {
               { header: 'Material', accessor: (i) => i.material },
               { header: 'Qty', accessor: (i) => `${i.quantity} ${i.unit}` },
               { header: 'Vehicle', accessor: (i) => i.vehicleNumber || '-' },
+              { header: 'Phase', accessor: (i) => i.phase || '-' },
             ]}
           />
         );
@@ -263,6 +265,8 @@ function App() {
         return <ChequeManager currentUser={currentUser.name} cheques={cheques} onAddCheque={handleAddCheque} onDeleteCheque={handleDeleteCheque} isAdmin={isAdmin} />;
       case 'invoices':
         return <InvoiceGenerator entries={entries} />;
+      case 'invoice-summary': // New Route
+        return <InvoiceSummary entries={entries} />;
       case 'client-ledger':
         return <ClientLedger />;
       case 'admin':

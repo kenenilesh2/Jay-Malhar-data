@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { MaterialType, MaterialEntry } from '../types';
-import { MATERIALS_LIST, UNITS, SITE_NAME, PREDEFINED_VEHICLES } from '../constants';
+import { MATERIALS_LIST, UNITS, SITE_NAME, PREDEFINED_VEHICLES, PHASES_LIST } from '../constants';
 import { generateChallanNumber } from '../services/utils';
 import { generateChallanPDF } from '../services/pdfService';
 
@@ -22,6 +22,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
     material: MATERIALS_LIST[0],
     quantity: '',
     vehicleNumber: '',
+    phase: '', // Added Phase state
   });
 
   useEffect(() => {
@@ -33,6 +34,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
         material: initialData.material,
         quantity: String(initialData.quantity),
         vehicleNumber: initialData.vehicleNumber || '',
+        phase: initialData.phase || '', // Load Phase if editing
       });
       setIsCustomVehicle(!isPredefined && !!initialData.vehicleNumber);
     } else {
@@ -90,6 +92,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
         unit: UNITS[formData.material],
         vehicleNumber: formData.vehicleNumber,
         siteName: SITE_NAME,
+        phase: formData.phase, // Pass phase
         createdBy: initialData ? initialData.createdBy : currentUser
       });
     } catch (err) {
@@ -138,19 +141,36 @@ const EntryForm: React.FC<EntryFormProps> = ({ currentUser, initialData, onSubmi
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Material *</label>
-          <select
-            name="material"
-            required
-            value={formData.material}
-            onChange={handleChange}
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
-          >
-            {MATERIALS_LIST.map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Material *</label>
+            <select
+              name="material"
+              required
+              value={formData.material}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+            >
+              {MATERIALS_LIST.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Phase (Optional)</label>
+            <select
+              name="phase"
+              value={formData.phase}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+            >
+              <option value="">-- Select Phase --</option>
+              {PHASES_LIST.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

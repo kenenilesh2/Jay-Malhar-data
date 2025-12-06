@@ -37,6 +37,7 @@ export interface MaterialEntry {
   unit: string;
   vehicleNumber?: string;
   siteName: string;
+  phase?: string; // Added Phase field
   createdBy: string;
   timestamp: number;
 }
@@ -65,7 +66,7 @@ export interface ChequeEntry {
   timestamp: number;
 }
 
-export type PageView = 'dashboard' | 'entries' | 'payments' | 'invoices' | 'cheques' | 'client-ledger' | 'admin';
+export type PageView = 'dashboard' | 'entries' | 'payments' | 'invoices' | 'invoice-summary' | 'cheques' | 'client-ledger' | 'admin';
 
 export type InvoiceCategory = 'Building Material' | 'Water Supply' | 'Machinery';
 
@@ -75,6 +76,17 @@ export interface InvoiceItem {
   challanNumber: string;
   vehicleNumber: string;
   description: string;
+  quantity: number;
+  rate: number;
+  amount: number;
+}
+
+export interface SummaryReportEntry {
+  srNo: number;
+  date: string;
+  challanNumber: string;
+  vehicleNumber: string;
+  material: string;
   quantity: number;
   rate: number;
   amount: number;
