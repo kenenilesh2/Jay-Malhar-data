@@ -143,24 +143,20 @@ export const generateMonthlyInvoicePDF = (
   const groupedData: Record<string, GroupedRow> = {};
 
   items.forEach(item => {
-    // Create a composite key for Vehicle + Description
     const key = `${item.vehicleNumber}||${item.description}`;
-    
     if (!groupedData[key]) {
       groupedData[key] = {
         vehicle: item.vehicleNumber,
         description: item.description,
         quantity: 0,
-        rate: item.rate, // Assuming rate is consistent for same material/vehicle
+        rate: item.rate,
         amount: 0
       };
     }
-    
     groupedData[key].quantity += item.quantity;
     groupedData[key].amount += item.amount;
   });
 
-  // Convert map to array and sort
   const tableRows = Object.values(groupedData).sort((a, b) => {
     if (a.vehicle < b.vehicle) return -1;
     if (a.vehicle > b.vehicle) return 1;
@@ -298,7 +294,7 @@ export const generateMonthlyInvoicePDF = (
   return { blob: doc.output('blob'), filename };
 };
 
-// --- SUMMARY PDF GENERATOR (UPDATED FOR WATER SUPPLY) ---
+// --- SUMMARY PDF GENERATOR (UPDATED FOR WATER SUPPLY & JCB) ---
 export const generateSummaryPDF = (
   items: SummaryReportEntry[],
   title: string,
@@ -326,21 +322,22 @@ export const generateSummaryPDF = (
   const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
 
-  // --- WATER SUPPLY FORMAT (DRINKING WATER) ---
-  if (category === 'Water Supply' && subCategory === 'Drinking Water') {
-      const waterData = items.map(item => [
+  // --- MACHINERY FORMAT (JCB) ---
+  if (category === 'Machinery' && subCategory === 'JCB') {
+      const jcbData = items.map(item => [
           item.date,
-          item.vehicleNumber,
-          item.material,
+          // Assuming 'challanNumber' stores Gatepass NO for Machinery or we reuse existing fields
+          // If we don't have Gatepass NO specifically, we might use Challan as a proxy.
+          item.challanNumber, 
+          item.material, // Description (JCB)
           item.quantity.toString(),
           item.rate.toString()
-          // Amount column deliberately omitted from BODY
       ]);
 
       autoTable(doc, {
           startY: 40,
-          head: [['DATE', 'LORRY NO', 'DESCRIPTION', 'QUANTITY', 'RATE']], // Updated Headers
-          body: waterData,
+          head: [['DATE', 'Gatepass NO', 'DESCRIPTION', 'QTY', 'RATE']],
+          body: jcbData,
           theme: 'grid',
           headStyles: { fillColor: [255, 255, 255], textColor: [0,0,0], fontStyle: 'bold', lineWidth: 0.1, lineColor: [0,0,0] },
           styles: { fontSize: 10, lineColor: [0,0,0], lineWidth: 0.1, textColor: [0,0,0], cellPadding: 2, halign: 'center' },
@@ -351,7 +348,50 @@ export const generateSummaryPDF = (
 
       const finalY = (doc as any).lastAutoTable.finalY;
       
-      // Draw Total Row manually to match image style (Yellow background)
+      autoTable(doc, {
+          startY: finalY,
+          head: [['', '', 'Total-', totalQty.toString(), totalAmount.toString()]],
+          body: [],
+          theme: 'grid',
+          showHead: 'firstPage',
+          headStyles: { 
+              fillColor: [255, 255, 0], // Yellow
+              textColor: [0,0,0], 
+              fontStyle: 'bold', 
+              lineWidth: 0.1, 
+              lineColor: [0,0,0],
+              halign: 'center'
+          },
+          columnStyles: {
+            2: { halign: 'right' }
+          }
+      });
+      
+  } 
+  // --- WATER SUPPLY FORMAT (DRINKING WATER) ---
+  else if (category === 'Water Supply' && subCategory === 'Drinking Water') {
+      const waterData = items.map(item => [
+          item.date,
+          item.vehicleNumber,
+          item.material,
+          item.quantity.toString(),
+          item.rate.toString()
+      ]);
+
+      autoTable(doc, {
+          startY: 40,
+          head: [['DATE', 'LORRY NO', 'DESCRIPTION', 'QUANTITY', 'RATE']], 
+          body: waterData,
+          theme: 'grid',
+          headStyles: { fillColor: [255, 255, 255], textColor: [0,0,0], fontStyle: 'bold', lineWidth: 0.1, lineColor: [0,0,0] },
+          styles: { fontSize: 10, lineColor: [0,0,0], lineWidth: 0.1, textColor: [0,0,0], cellPadding: 2, halign: 'center' },
+          columnStyles: {
+              2: { halign: 'left' } 
+          },
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY;
+      
       autoTable(doc, {
           startY: finalY,
           head: [['', '', 'Total', totalQty.toString(), totalAmount.toString()]],
@@ -372,7 +412,7 @@ export const generateSummaryPDF = (
       });
 
   } else {
-      // --- STANDARD FORMAT (Building Material / Machinery / Other Water) ---
+      // --- STANDARD FORMAT ---
       const tableData = items.map(item => [
         item.srNo,
         item.date,
@@ -412,7 +452,6 @@ export const generateSummaryPDF = (
   doc.save(`${title.replace(/ /g, '_')}.pdf`);
 };
 
-// --- LEDGER PDF EXPORT (Required for ClientLedger.tsx) ---
 export const generateLedgerPDF = (entries: ClientLedgerEntry[], periodLabel: string) => {
   const doc = new jsPDF();
   addHeader(doc, "CLIENT LEDGER STATEMENT");
