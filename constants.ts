@@ -53,11 +53,11 @@ export const UNITS: Record<string, string> = {
 
 export const SITE_NAME = "Arihant Aaradhya";
 
-// --- COMPANY DETAILS FOR PDF ---
+// --- COMPANY DETAILS FOR PDF (MATCHING IMAGE) ---
 export const COMPANY_DETAILS = {
   name: "JAY MALHAR ENTERPRISES",
   subtitle: "BUILDING MATERIAL SUPPLIER",
-  address: "At. Bapgaon, Post. Padgha, Tal. Bhiwandi, Dist. Thane, Maharashtra",
+  address: "At. Bapgaon, Post. Loand, Tal. Bhiwandi, Dist. Thane, Maharashtra",
   gstin: "27AASFJ3172C1ZA",
   stateCode: "27",
   bankName: "Federal Bank, Kalyan (W)",
@@ -102,6 +102,20 @@ export const MATERIAL_CATEGORIES: Record<string, InvoiceCategory> = {
   [MaterialType.DRINKING_JAR]: 'Water Supply',
   [MaterialType.JCB]: 'Machinery',
   [MaterialType.DUMPER]: 'Machinery'
+};
+
+// NEW: Mapping for sub-categories
+export const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
+  'Water Supply': [
+    MaterialType.CONSTRUCTION_WATER, 
+    MaterialType.DRINKING_WATER, 
+    MaterialType.BORING_WATER, 
+    MaterialType.DRINKING_JAR
+  ],
+  'Machinery': [
+    MaterialType.JCB, 
+    MaterialType.DUMPER
+  ]
 };
 
 export const GST_RATES: Record<InvoiceCategory, { cgst: number, sgst: number }> = {

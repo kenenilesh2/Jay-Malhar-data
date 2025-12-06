@@ -67,110 +67,135 @@ export const generateChallanPDF = (entry: MaterialEntry) => {
   doc.save(`Challan_${entry.challanNumber}.pdf`);
 };
 
+// --- MAIN INVOICE GENERATOR MATCHING IMAGE ---
 export const generateMonthlyInvoicePDF = (
   month: string, 
   category: InvoiceCategory, 
   items: InvoiceItem[],
   totalBase: number,
   totalTax: number,
-  grandTotal: number
+  grandTotal: number,
+  subCategory?: string // Added subCategory parameter
 ): { blob: Blob; filename: string } => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   
-  // --- HEADER ---
+  // --- 1. HEADER SECTION ---
   doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
   doc.text("TAX INVOICE", pageWidth / 2, 8, { align: 'center' });
+
   doc.setFontSize(26);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(60, 0, 0);
+  doc.setTextColor(60, 0, 0); // Dark brownish red
   doc.text(COMPANY_DETAILS.name, pageWidth / 2, 18, { align: 'center' });
+  
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
   doc.text(COMPANY_DETAILS.subtitle, pageWidth / 2, 24, { align: 'center' });
+
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text(`Address : ${COMPANY_DETAILS.address}`, pageWidth / 2, 29, { align: 'center' });
+  
+  // Line separator
   doc.setLineWidth(0.5);
   doc.line(10, 32, pageWidth - 10, 32);
+
+  // GSTIN Line
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.text(`GSTIN No. : ${COMPANY_DETAILS.gstin}`, 15, 37);
   doc.text(`State : Maharashtra`, pageWidth / 2, 37, { align: 'center' });
   doc.text(`State Code : ${COMPANY_DETAILS.stateCode}`, pageWidth - 15, 37, { align: 'right' });
+
   doc.line(10, 40, pageWidth - 10, 40);
 
-  // --- INVOICE INFO ---
+  // --- 2. INVOICE INFO ---
+  // Mock Invoice No logic
   const invNo = `55/${month.slice(2,4)}-${(parseInt(month.slice(2,4))+1)}`; 
-  const invDate = new Date().toLocaleDateString('en-IN'); 
+  const invDate = new Date().toLocaleDateString('en-IN'); // Today's date
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text(`Invoice No. : ${invNo}`, 15, 46);
   doc.text(`Invoice Date : ${invDate}`, pageWidth - 15, 46, { align: 'right' });
 
-  // --- PARTY DETAILS ---
+  // Optional: Display Sub-category if filtered
+  if (subCategory && subCategory !== 'All') {
+      doc.setFontSize(9);
+      doc.text(`Sub-Category : ${subCategory}`, 15, 49.5);
+  }
+
+  // --- 3. PARTY DETAILS ---
   doc.setFont('helvetica', 'bold');
   doc.text("Party Name", 15, 52);
   doc.text(`  ${CUSTOMER_DETAILS.name}`, 36, 52); 
+
   doc.setFont('helvetica', 'normal');
   doc.text("Address", 15, 57);
   const addressLines = doc.splitTextToSize(CUSTOMER_DETAILS.address, pageWidth - 50);
   doc.setFont('helvetica', 'bold');
   doc.text(addressLines, 36, 57);
+
   let currentY = 57 + (addressLines.length * 5);
+
   doc.text(`GSTIN No. : ${CUSTOMER_DETAILS.gstin}`, 15, currentY);
   doc.text(`State : MAHARASHTRA`, 115, currentY);
   doc.text(`State Code ${CUSTOMER_DETAILS.stateCode}`, pageWidth - 15, currentY, { align: 'right' });
+
   currentY += 3;
   doc.line(10, currentY, pageWidth - 10, currentY);
 
-  // --- GROUPING LOGIC (VEHICLE + DESCRIPTION) ---
-  interface GroupedRow {
-    vehicle: string;
+  // --- 4. AGGREGATE ITEMS (GROUP BY VEHICLE & DESC) ---
+  interface AggregatedItem {
+    vehicleNumber: string;
     description: string;
     quantity: number;
     rate: number;
     amount: number;
   }
 
-  const groupedData: Record<string, GroupedRow> = {};
+  const aggregatedMap: Record<string, AggregatedItem> = {};
 
   items.forEach(item => {
     const key = `${item.vehicleNumber}||${item.description}`;
-    
-    if (!groupedData[key]) {
-      groupedData[key] = {
-        vehicle: item.vehicleNumber,
+    if (!aggregatedMap[key]) {
+      aggregatedMap[key] = {
+        vehicleNumber: item.vehicleNumber,
         description: item.description,
         quantity: 0,
         rate: item.rate,
         amount: 0
       };
     }
-    
-    groupedData[key].quantity += item.quantity;
-    groupedData[key].amount += item.amount;
+    aggregatedMap[key].quantity += item.quantity;
+    aggregatedMap[key].amount += item.amount;
   });
 
-  const tableRows = Object.values(groupedData).sort((a, b) => {
-    if (a.vehicle < b.vehicle) return -1;
-    if (a.vehicle > b.vehicle) return 1;
-    return 0;
-  }).map(row => [
-    '',                 // Date (Requested Empty)
-    '',                 // Challan (Requested Empty)
-    row.vehicle,        // Lorry No.
-    row.description,    // Description
-    row.quantity.toFixed(2), 
-    Math.round(row.rate),
-    Math.round(row.amount)
+  const tableData = Object.values(aggregatedMap).sort((a, b) => {
+      // Sort by Vehicle Number then Description
+      if (a.vehicleNumber < b.vehicleNumber) return -1;
+      if (a.vehicleNumber > b.vehicleNumber) return 1;
+      if (a.description < b.description) return -1;
+      if (a.description > b.description) return 1;
+      return 0;
+  }).map(item => [
+    '', // Date (Empty as requested)
+    '', // Challan No (Empty as requested)
+    item.vehicleNumber,
+    item.description,
+    item.quantity.toFixed(2),
+    Math.round(item.rate),
+    Math.round(item.amount) 
   ]);
 
+  // Draw Table
   autoTable(doc, {
     startY: currentY + 2,
     head: [['Date', 'Challan\nNo.', 'Lorry No.', 'DESCRIPTION', 'Quantity', 'RATE', 'Amount\nRs.']],
-    body: tableRows,
+    body: tableData,
     theme: 'plain', 
     styles: { 
       fontSize: 10, 
@@ -189,53 +214,62 @@ export const generateMonthlyInvoicePDF = (
       lineColor: [0, 0, 0]
     },
     columnStyles: {
-      0: { cellWidth: 15, halign: 'center' }, 
-      1: { cellWidth: 18, halign: 'center' }, 
-      2: { cellWidth: 28, halign: 'center', fontStyle: 'bold' }, 
-      3: { cellWidth: 'auto', halign: 'left' }, 
-      4: { cellWidth: 18, halign: 'center' }, 
-      5: { cellWidth: 20, halign: 'center' }, 
-      6: { cellWidth: 30, halign: 'right' }, 
+      0: { cellWidth: 15, halign: 'center' }, // Date
+      1: { cellWidth: 18, halign: 'center' }, // Challan
+      2: { cellWidth: 28, halign: 'center', fontStyle: 'bold' }, // Lorry
+      3: { cellWidth: 'auto', halign: 'left' }, // Desc
+      4: { cellWidth: 18, halign: 'center' }, // Qty
+      5: { cellWidth: 20, halign: 'center' }, // Rate
+      6: { cellWidth: 30, halign: 'right' }, // Amount
     },
     margin: { left: 10, right: 10 },
   });
 
-  // --- FOOTER ---
+  // --- 5. FOOTER ---
   let finalY = (doc as any).lastAutoTable.finalY;
+  
   if (finalY > 220) {
     doc.addPage();
     finalY = 20;
   }
+
   const bottomStart = finalY;
   const bottomEnd = 280;
   const boxHeight = bottomEnd - bottomStart;
   
-  doc.rect(10, bottomStart, pageWidth - 20, boxHeight);
+  doc.rect(10, bottomStart, pageWidth - 20, boxHeight); // Main Footer Box
+
   const splitX = 145; 
   doc.line(splitX, bottomStart, splitX, bottomEnd);
 
-  // Left Side
+  // -- LEFT SIDE CONTENT --
   let leftY = bottomStart + 5;
+  
+  // Amount in Words
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text("Total Invoice Amount (Including GST)", 12, leftY);
+  
   doc.setFont('helvetica', 'bolditalic');
   const words = numberToWords(Math.round(grandTotal));
   const wordLines = doc.splitTextToSize(words, splitX - 15);
   doc.text(wordLines, 12, leftY + 5);
   
+  // Bank Details Section
   leftY += 15 + (wordLines.length * 4);
-  doc.line(10, leftY, splitX, leftY);
+  doc.line(10, leftY, splitX, leftY); // Separator
   
   leftY += 5;
   doc.setFont('helvetica', 'bold');
   doc.text("Bank Details", 12, leftY);
+  
   leftY += 5;
   doc.setFont('helvetica', 'normal');
   doc.text(`Bank Name : ${COMPANY_DETAILS.bankName}`, 12, leftY);
   doc.text(`A/C No. : ${COMPANY_DETAILS.acNo}`, 12, leftY + 5);
   doc.text(`IFSC Code : ${COMPANY_DETAILS.ifsc}`, 12, leftY + 10);
 
+  // Declaration
   const decY = bottomEnd - 35;
   doc.line(10, decY, splitX, decY);
   doc.setFontSize(7);
@@ -245,7 +279,7 @@ export const generateMonthlyInvoicePDF = (
   doc.text("2) Error and Omission Excepted.", 12, decY + 14);
   doc.text("3) Subject to Kalyan Jurisdiction", 12, decY + 17);
 
-  // Right Side
+  // -- RIGHT SIDE CONTENT (TOTALS) --
   const taxes = GST_RATES[category];
   const rightLabelX = splitX + 2;
   const rightValueX = pageWidth - 12;
@@ -274,6 +308,7 @@ export const generateMonthlyInvoicePDF = (
   
   drawTotalRow("Round Off", "0");
 
+  // G. TOTAL
   doc.setFont('helvetica', 'bold');
   doc.text("G. TOTAL", rightLabelX, rightY + 5.5);
   doc.text(Math.round(grandTotal).toString(), rightValueX, rightY + 5.5, { align: 'right' });

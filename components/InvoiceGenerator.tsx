@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { MaterialEntry, InvoiceCategory, InvoiceItem, GeneratedInvoice } from '../types';
-import { MATERIAL_CATEGORIES, DEFAULT_RATES, GST_RATES } from '../constants';
+import { MATERIAL_CATEGORIES, DEFAULT_RATES, GST_RATES, CATEGORY_SUBCATEGORIES } from '../constants';
 import { generateMonthlyInvoicePDF } from '../services/pdfService';
 import { formatCurrency } from '../services/utils';
 import { saveGeneratedInvoice, getSavedInvoices } from '../services/dataService';
@@ -13,6 +12,7 @@ interface InvoiceGeneratorProps {
 const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [selectedCategory, setSelectedCategory] = useState<InvoiceCategory>('Building Material');
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string>('All'); // NEW State
   const [customRates, setCustomRates] = useState<Record<string, number>>(DEFAULT_RATES);
   const [savedInvoices, setSavedInvoices] = useState<GeneratedInvoice[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -24,15 +24,30 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
     };
     fetchSaved();
   }, []);
+
+  // Reset Sub Category when Main Category changes
+  useEffect(() => {
+    setSelectedSubCategory('All');
+  }, [selectedCategory]);
   
   // Filter entries
   const filteredEntries = useMemo(() => {
     return entries.filter(e => {
       const entryMonth = e.date.slice(0, 7);
       const category = MATERIAL_CATEGORIES[e.material];
-      return entryMonth === selectedMonth && category === selectedCategory;
+      
+      const matchMonth = entryMonth === selectedMonth;
+      const matchCategory = category === selectedCategory;
+      
+      // Sub-category filter logic
+      let matchSubCategory = true;
+      if (selectedSubCategory !== 'All') {
+          matchSubCategory = e.material === selectedSubCategory;
+      }
+
+      return matchMonth && matchCategory && matchSubCategory;
     });
-  }, [entries, selectedMonth, selectedCategory]);
+  }, [entries, selectedMonth, selectedCategory, selectedSubCategory]);
 
   // Calculate items
   const invoiceItems: InvoiceItem[] = useMemo(() => {
@@ -70,7 +85,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
       alert("No entries found for this month/category.");
       return;
     }
-    const { blob, filename } = generateMonthlyInvoicePDF(selectedMonth, selectedCategory, invoiceItems, totalBase, cgstAmt + sgstAmt, grandTotal);
+    const { blob, filename } = generateMonthlyInvoicePDF(selectedMonth, selectedCategory, invoiceItems, totalBase, cgstAmt + sgstAmt, grandTotal, selectedSubCategory);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -86,8 +101,14 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
     }
     setIsSaving(true);
     try {
-      const { blob } = generateMonthlyInvoicePDF(selectedMonth, selectedCategory, invoiceItems, totalBase, cgstAmt + sgstAmt, grandTotal);
-      const saved = await saveGeneratedInvoice(selectedMonth, selectedCategory, grandTotal, blob);
+      const { blob } = generateMonthlyInvoicePDF(selectedMonth, selectedCategory, invoiceItems, totalBase, cgstAmt + sgstAmt, grandTotal, selectedSubCategory);
+      
+      // Append sub-category to DB category string if specific one selected
+      const categoryLabel = selectedSubCategory !== 'All' 
+        ? `${selectedCategory} - ${selectedSubCategory}` 
+        : selectedCategory;
+
+      const saved = await saveGeneratedInvoice(selectedMonth, categoryLabel, grandTotal, blob);
       if (saved) {
         alert("Invoice saved successfully!");
         const updatedList = await getSavedInvoices();
@@ -100,19 +121,22 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
     }
   };
 
-  // Get ALL materials that belong to this category
+  // Get ALL materials that belong to this category for Rate Config
   const categoryMaterials = useMemo(() => {
     return Object.keys(MATERIAL_CATEGORIES).filter(
       mat => MATERIAL_CATEGORIES[mat] === selectedCategory
     );
   }, [selectedCategory]);
 
+  // Available Sub-Categories for dropdown
+  const availableSubCategories = CATEGORY_SUBCATEGORIES[selectedCategory] || [];
+
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <h2 className="text-xl font-bold text-slate-800 mb-6">Monthly Invoice Generator</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Select Month</label>
             <input 
@@ -134,6 +158,28 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
               <option value="Machinery">Machinery</option>
             </select>
           </div>
+
+          {/* Sub-Category Dropdown (Visible only if options exist) */}
+          <div>
+             <label className="block text-sm font-medium text-slate-700 mb-1">Sub-Category</label>
+             {availableSubCategories.length > 0 ? (
+                <select
+                  value={selectedSubCategory}
+                  onChange={(e) => setSelectedSubCategory(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
+                >
+                  <option value="All">All {selectedCategory}</option>
+                  {availableSubCategories.map(sc => (
+                    <option key={sc} value={sc}>{sc}</option>
+                  ))}
+                </select>
+             ) : (
+               <div className="w-full px-4 py-2 border border-slate-100 bg-slate-50 text-slate-400 rounded-lg italic">
+                 None
+               </div>
+             )}
+          </div>
+
           <div className="flex flex-col justify-end gap-2">
             <button 
               onClick={handleDownload}
