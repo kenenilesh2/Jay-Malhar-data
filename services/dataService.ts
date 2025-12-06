@@ -1,5 +1,5 @@
 
-import { MaterialEntry, SupplierPayment, User, ChequeEntry, ClientLedgerEntry } from '../types';
+import { MaterialEntry, SupplierPayment, User, ChequeEntry, ClientLedgerEntry, GeneratedInvoice } from '../types';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { INITIAL_USERS } from '../constants';
 
@@ -9,7 +9,8 @@ const LS_KEYS = {
   PAYMENTS: 'jay_malhar_payments',
   USERS: 'jay_malhar_users',
   CHEQUES: 'jay_malhar_cheques',
-  LEDGER: 'jay_malhar_client_ledger'
+  LEDGER: 'jay_malhar_client_ledger',
+  INVOICES: 'jay_malhar_generated_invoices'
 };
 
 // Helper to log errors safely
@@ -273,7 +274,7 @@ export const updateUserPassword = async (username: string, newPass: string): Pro
 // --- CLIENT LEDGER ---
 export const getClientLedgerEntries = async (): Promise<ClientLedgerEntry[]> => {
   if (isSupabaseConfigured() && supabase) {
-    const { data, error } = await supabase.from('client_ledger').select('*').order('created_at', { ascending: true });
+    const { data, error } = await supabase.from('client_ledger').select('*').order('date', { ascending: true });
     if (error) { logSupabaseError('getClientLedgerEntries', error); return []; }
     return data.map((d: any) => ({
       id: d.id,
@@ -321,5 +322,75 @@ export const bulkAddClientLedgerEntries = async (entries: ClientLedgerEntry[]): 
     }
   } else {
     localStorage.setItem(LS_KEYS.LEDGER, JSON.stringify(entries));
+  }
+};
+
+// --- GENERATED INVOICES ---
+export const saveGeneratedInvoice = async (month: string, category: string, totalAmount: number, pdfBlob: Blob): Promise<GeneratedInvoice | null> => {
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const fileName = `invoice_${category}_${month}_${Date.now()}.pdf`.replace(/\s+/g, '_');
+      const { error: uploadError } = await supabase.storage.from('invoices').upload(fileName, pdfBlob, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage.from('invoices').getPublicUrl(fileName);
+      const fileUrl = publicUrlData.publicUrl;
+
+      const { data, error } = await supabase.from('generated_invoices').insert([{
+        month,
+        category,
+        total_amount: totalAmount,
+        file_url: fileUrl
+      }]).select().single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        month: data.month,
+        category: data.category,
+        totalAmount: Number(data.total_amount),
+        fileUrl: data.file_url,
+        createdAt: data.created_at
+      };
+    } catch (e) {
+      console.error("Failed to save generated invoice:", e);
+      throw e;
+    }
+  } else {
+    console.warn("Supabase not configured, cannot save invoice to database.");
+    // Fallback to local storage (mock saving)
+    const newInv: GeneratedInvoice = {
+      id: Math.random().toString(),
+      month,
+      category,
+      totalAmount,
+      fileUrl: '#', // No real URL in local mode
+      createdAt: new Date().toISOString()
+    };
+    const current = safeJsonParse<GeneratedInvoice[]>(localStorage.getItem(LS_KEYS.INVOICES), []);
+    localStorage.setItem(LS_KEYS.INVOICES, JSON.stringify([newInv, ...current]));
+    return newInv;
+  }
+};
+
+export const getSavedInvoices = async (): Promise<GeneratedInvoice[]> => {
+  if (isSupabaseConfigured() && supabase) {
+    const { data, error } = await supabase.from('generated_invoices').select('*').order('created_at', { ascending: false });
+    if (error) { logSupabaseError('getSavedInvoices', error); return []; }
+    return data.map((d: any) => ({
+      id: d.id,
+      month: d.month,
+      category: d.category,
+      totalAmount: Number(d.total_amount),
+      fileUrl: d.file_url,
+      createdAt: d.created_at
+    }));
+  } else {
+    return safeJsonParse(localStorage.getItem(LS_KEYS.INVOICES), []);
   }
 };

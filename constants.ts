@@ -53,12 +53,31 @@ export const UNITS: Record<string, string> = {
 
 export const SITE_NAME = "Arihant Aaradhya";
 
+// --- COMPANY DETAILS FOR PDF ---
+export const COMPANY_DETAILS = {
+  name: "JAY MALHAR ENTERPRISES",
+  subtitle: "BUILDING MATERIAL SUPPLIER",
+  address: "At. Bapgaon, Post. Padgha, Tal. Bhiwandi, Dist. Thane, Maharashtra",
+  gstin: "27AASFJ3172C1ZA",
+  stateCode: "27",
+  bankName: "Federal Bank, Kalyan (W)",
+  acNo: "15420200005950",
+  ifsc: "FDRL0001542"
+};
+
+export const CUSTOMER_DETAILS = {
+  name: "Arihant Superstructures Ltd.",
+  address: "Arihant Aura, B-Wing, 25th Floor, Plot 13/1, TTC Industrial Area, Vashi",
+  gstin: "27AABCS1848L1Z2",
+  stateCode: "421302" // As per image
+};
+
 export const DEFAULT_RATES: Record<string, number> = {
   [MaterialType.METAL1]: 2650,
   [MaterialType.METAL2]: 2650,
   [MaterialType.METAL4]: 2650,
   [MaterialType.GSB]: 2000,
-  [MaterialType.WASHSAND]: 6350,
+  [MaterialType.WASHSAND]: 6600, 
   [MaterialType.CRUSHSAND]: 3550,
   [MaterialType.RUBBLE]: 2200,
   [MaterialType.DUMPER]: 7000,
@@ -112,8 +131,8 @@ export const PREDEFINED_VEHICLES = [
   { number: 'MH041509', capacity: 1, materials: [MaterialType.DUMPER] }, 
   
   // Water & Jars
-  { number: 'MH12FC2877', capacity: 1, materials: [MaterialType.BORING_WATER] }, // Boring Tanker
-  { number: 'MH05K8980', capacity: 1, materials: [MaterialType.DRINKING_WATER] },  // Drinking Tanker
-  { number: 'MH04GQ7386', capacity: 1, materials: [MaterialType.DRINKING_JAR] }, // Drinking Jar
-  { number: 'MH05DD7725', capacity: 1, materials: [MaterialType.CONSTRUCTION_WATER] }, // Construction Tanker
+  { number: 'MH12FC2877', capacity: 1, materials: [MaterialType.BORING_WATER] }, 
+  { number: 'MH05K8980', capacity: 1, materials: [MaterialType.DRINKING_WATER] },  
+  { number: 'MH04GQ7386', capacity: 1, materials: [MaterialType.DRINKING_JAR] }, 
+  { number: 'MH05DD7725', capacity: 1, materials: [MaterialType.CONSTRUCTION_WATER] }, 
 ];

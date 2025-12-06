@@ -1,8 +1,10 @@
-import React, { useState, useMemo } from 'react';
-import { MaterialEntry, InvoiceCategory, InvoiceItem } from '../types';
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { MaterialEntry, InvoiceCategory, InvoiceItem, GeneratedInvoice } from '../types';
 import { MATERIAL_CATEGORIES, DEFAULT_RATES, GST_RATES } from '../constants';
 import { generateMonthlyInvoicePDF } from '../services/pdfService';
 import { formatCurrency } from '../services/utils';
+import { saveGeneratedInvoice, getSavedInvoices } from '../services/dataService';
 
 interface InvoiceGeneratorProps {
   entries: MaterialEntry[];
@@ -12,14 +14,24 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [selectedCategory, setSelectedCategory] = useState<InvoiceCategory>('Building Material');
   const [customRates, setCustomRates] = useState<Record<string, number>>(DEFAULT_RATES);
+  const [savedInvoices, setSavedInvoices] = useState<GeneratedInvoice[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    const fetchSaved = async () => {
+      const invoices = await getSavedInvoices();
+      setSavedInvoices(invoices);
+    };
+    fetchSaved();
+  }, []);
+  
   // Filter entries
   const filteredEntries = useMemo(() => {
     return entries.filter(e => {
       const entryMonth = e.date.slice(0, 7);
       const category = MATERIAL_CATEGORIES[e.material];
       return entryMonth === selectedMonth && category === selectedCategory;
-    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    });
   }, [entries, selectedMonth, selectedCategory]);
 
   // Calculate items
@@ -58,10 +70,37 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
       alert("No entries found for this month/category.");
       return;
     }
-    generateMonthlyInvoicePDF(selectedMonth, selectedCategory, invoiceItems, totalBase, cgstAmt + sgstAmt, grandTotal);
+    const { blob, filename } = generateMonthlyInvoicePDF(selectedMonth, selectedCategory, invoiceItems, totalBase, cgstAmt + sgstAmt, grandTotal);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
-  // Get ALL materials that belong to this category (to show rates even if no entries exist yet)
+  const handleSave = async () => {
+     if (invoiceItems.length === 0) {
+      alert("No entries found to save.");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const { blob } = generateMonthlyInvoicePDF(selectedMonth, selectedCategory, invoiceItems, totalBase, cgstAmt + sgstAmt, grandTotal);
+      const saved = await saveGeneratedInvoice(selectedMonth, selectedCategory, grandTotal, blob);
+      if (saved) {
+        alert("Invoice saved successfully!");
+        const updatedList = await getSavedInvoices();
+        setSavedInvoices(updatedList);
+      }
+    } catch (e: any) {
+      alert("Failed to save invoice: " + e.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Get ALL materials that belong to this category
   const categoryMaterials = useMemo(() => {
     return Object.keys(MATERIAL_CATEGORIES).filter(
       mat => MATERIAL_CATEGORIES[mat] === selectedCategory
@@ -95,12 +134,20 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
               <option value="Machinery">Machinery</option>
             </select>
           </div>
-          <div className="flex items-end">
+          <div className="flex flex-col justify-end gap-2">
             <button 
               onClick={handleDownload}
               className="w-full px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-lg shadow transition-colors flex items-center justify-center"
             >
-              <i className="fas fa-file-pdf mr-2"></i> Generate Invoice PDF
+              <i className="fas fa-file-pdf mr-2"></i> Download PDF
+            </button>
+             <button 
+              onClick={handleSave}
+              disabled={isSaving}
+              className="w-full px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow transition-colors flex items-center justify-center disabled:opacity-50"
+            >
+              {isSaving ? <i className="fas fa-spinner fa-spin mr-2"></i> : <i className="fas fa-cloud-upload-alt mr-2"></i>}
+              Save to History
             </button>
           </div>
         </div>
@@ -110,15 +157,15 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
           <h3 className="text-sm font-semibold text-slate-700 mb-3">Rate Configuration (Per Unit)</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {categoryMaterials.map(mat => (
-              <div key={mat}>
-                <label className="block text-xs text-slate-500 mb-1">{mat}</label>
-                <input 
-                  type="number" 
-                  value={customRates[mat] ?? 0} 
-                  onChange={(e) => handleRateChange(mat, e.target.value)}
-                  className="w-full px-3 py-1 border border-slate-300 rounded text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                />
-              </div>
+                <div key={mat}>
+                  <label className="block text-xs text-slate-500 mb-1">{mat}</label>
+                  <input 
+                    type="number" 
+                    value={customRates[mat] ?? 0} 
+                    onChange={(e) => handleRateChange(mat, e.target.value)}
+                    className="w-full px-3 py-1 border border-slate-300 rounded text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  />
+                </div>
             ))}
           </div>
         </div>
@@ -182,6 +229,49 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({ entries }) => {
             )}
           </table>
         </div>
+      </div>
+
+      {/* Saved Invoices History */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <h3 className="text-lg font-bold text-slate-800 mb-4">Invoice History</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-600 border-b">
+                    <tr>
+                        <th className="px-4 py-3">Month</th>
+                        <th className="px-4 py-3">Category</th>
+                        <th className="px-4 py-3 text-right">Total Amount</th>
+                        <th className="px-4 py-3 text-right">Created At</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {savedInvoices.map(inv => (
+                        <tr key={inv.id} className="hover:bg-slate-50">
+                            <td className="px-4 py-3">{inv.month}</td>
+                            <td className="px-4 py-3">{inv.category}</td>
+                            <td className="px-4 py-3 text-right font-medium">{formatCurrency(inv.totalAmount)}</td>
+                            <td className="px-4 py-3 text-right text-slate-500">{new Date(inv.createdAt).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-right">
+                                <a 
+                                  href={inv.fileUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-brand-600 hover:text-brand-800 font-medium flex items-center justify-end"
+                                >
+                                    <i className="fas fa-external-link-alt mr-1"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                    ))}
+                    {savedInvoices.length === 0 && (
+                        <tr>
+                            <td colSpan={5} className="px-4 py-8 text-center text-slate-400">No saved invoices yet.</td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+          </div>
       </div>
     </div>
   );

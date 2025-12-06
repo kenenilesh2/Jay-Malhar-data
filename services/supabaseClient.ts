@@ -109,10 +109,10 @@ create table if not exists cheque_entries (
   created_at timestamptz default now()
 );
 
--- 5. Client Ledger Table (For Bulk Uploads)
+-- 5. Client Ledger Table
 create table if not exists client_ledger (
   id uuid default gen_random_uuid() primary key,
-  date text,
+  date date not null,
   particulars text,
   dr_cr text,
   account_name text,
@@ -124,21 +124,36 @@ create table if not exists client_ledger (
   created_at timestamptz default now()
 );
 
--- 6. STORAGE BUCKET SETUP
+-- 6. Generated Invoices Table
+create table if not exists generated_invoices (
+  id uuid default gen_random_uuid() primary key,
+  month text not null,
+  category text not null,
+  total_amount numeric not null,
+  file_url text not null,
+  created_at timestamptz default now()
+);
+
+-- 7. STORAGE BUCKET SETUP
 insert into storage.buckets (id, name, public) values ('cheques', 'cheques', true);
-create policy "Public Access" on storage.objects for all using ( bucket_id = 'cheques' );
+insert into storage.buckets (id, name, public) values ('invoices', 'invoices', true);
+
+create policy "Public Access Cheques" on storage.objects for all using ( bucket_id = 'cheques' );
+create policy "Public Access Invoices" on storage.objects for all using ( bucket_id = 'invoices' );
 
 
--- 7. SCHEMA REPAIR & RLS
+-- 8. SCHEMA REPAIR & RLS
 alter table entries enable row level security;
 alter table payments enable row level security;
 alter table users enable row level security;
 alter table cheque_entries enable row level security;
 alter table client_ledger enable row level security;
+alter table generated_invoices enable row level security;
 
 create policy "Public access entries" on entries for all using (true) with check (true);
 create policy "Public access payments" on payments for all using (true) with check (true);
 create policy "Public access users" on users for all using (true) with check (true);
 create policy "Public access cheques" on cheque_entries for all using (true) with check (true);
 create policy "Public access ledger" on client_ledger for all using (true) with check (true);
+create policy "Public access invoices" on generated_invoices for all using (true) with check (true);
 */

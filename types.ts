@@ -92,3 +92,12 @@ export interface ClientLedgerEntry {
   credit: number;
   description?: string;
 }
+
+export interface GeneratedInvoice {
+  id: string;
+  month: string;
+  category: string;
+  totalAmount: number;
+  fileUrl: string;
+  createdAt: string;
+}
